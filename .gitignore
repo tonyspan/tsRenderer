@@ -1,0 +1,19 @@
+# Binaries
+**/bin/
+!scripts/premake/bin
+bin-int/
+
+# Files
+*.log
+*.spv
+
+# Visual Studio files and folder
+.vs/
+**.sln
+**.vcxproj
+**.vcxproj.filters
+**.vcxproj.user
+
+# Directories
+scripts/__pycache__
+3rdparty/SDL/
