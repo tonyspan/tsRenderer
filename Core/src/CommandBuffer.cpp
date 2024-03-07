@@ -12,32 +12,19 @@
 
 #include <array>
 
-CommandBufferDescription::CommandBufferDescription()
-	: Pool(nullptr), Level(VK_COMMAND_BUFFER_LEVEL_PRIMARY)
+Ref<CommandBuffer> CommandBuffer::Create(bool isPrimary)
 {
+	return CreateRef<CommandBuffer>(isPrimary);
 }
 
-CommandBufferDescription::CommandBufferDescription(const CommandPool* pool, VkCommandBufferLevel level)
-	: Pool(pool), Level(level)
+CommandBuffer::CommandBuffer(bool isPrimary)
 {
-}
-
-Ref<CommandBuffer> CommandBuffer::Create(const CommandBufferDescription& desc)
-{
-	ASSERT(desc.Pool, "CommandPool must be valid");
-
-	return CreateRef<CommandBuffer>(desc);
-}
-
-CommandBuffer::CommandBuffer(const CommandBufferDescription& desc)
-	: m_Description(desc)
-{
-	CreateCommandBuffer();
+	CreateCommandBuffer(isPrimary);
 }
 
 CommandBuffer::~CommandBuffer()
 {
-	vkFreeCommandBuffers(Context::GetDevice().GetHandle(), m_Description.Pool->GetHandle(), 1, &Handle::GetHandle());
+	vkFreeCommandBuffers(Context::GetDevice().GetHandle(), Context::GetDevice().GetCommandPool().GetHandle(), 1, &Handle::GetHandle());
 }
 
 void CommandBuffer::BeginRecording()
@@ -120,16 +107,14 @@ void CommandBuffer::DrawIndexed(uint32_t indexCount, uint32_t firstIndex)
 	vkCmdDrawIndexed(Handle::GetHandle(), indexCount, 1, firstIndex, 0, 0);
 }
 
-void CommandBuffer::CreateCommandBuffer()
+void CommandBuffer::CreateCommandBuffer(bool isPrimary)
 {
-	const CommandPool* pool = m_Description.Pool;
-
 	VkCommandBufferAllocateInfo bufferAllocInfo;
 	ZeroInitVkStruct(bufferAllocInfo, VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO);
 
 	bufferAllocInfo.commandBufferCount = 1;
-	bufferAllocInfo.commandPool = pool->GetHandle();
-	bufferAllocInfo.level = m_Description.Level;
+	bufferAllocInfo.commandPool = Context::GetDevice().GetCommandPool().GetHandle();
+	bufferAllocInfo.level = isPrimary ? VK_COMMAND_BUFFER_LEVEL_PRIMARY : VK_COMMAND_BUFFER_LEVEL_SECONDARY;
 
 	VkResult result = vkAllocateCommandBuffers(Context::GetDevice().GetHandle(), &bufferAllocInfo, &Handle::GetHandle());
 	VK_CHECK_RESULT(result);

@@ -104,12 +104,7 @@ void Gui::Init(const Window& window)
 
 	// Upload Fonts
 	{
-		CommandBufferDescription desc;
-
-		desc.Pool = &device.GetCommandPool();
-		desc.Level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-
-		Ref<CommandBuffer> commandBuffer = CommandBuffer::Create(desc);
+		Ref<CommandBuffer> commandBuffer = CommandBuffer::Create(true);
 		commandBuffer->BeginSingleTime();
 
 		ImGui_ImplVulkan_CreateFontsTexture(commandBuffer->GetHandle());

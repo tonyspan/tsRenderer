@@ -7,16 +7,10 @@
 
 #include <vulkan/vulkan.h>
 
-
-SamplerDescription::SamplerDescription()
-	: MipLevels(0)
-	, MinFilter(VK_FILTER_NEAREST)
-	, MagFilter(VK_FILTER_NEAREST)
-{
-}
-
 Ref<Sampler> Sampler::Create(const SamplerDescription& desc)
 {
+	ASSERT(desc.MipLevels != 0);
+
 	return CreateRef<Sampler>(desc);
 }
 
@@ -39,8 +33,8 @@ void Sampler::CreateSampler()
 	VkSamplerCreateInfo samplerInfo;
 	ZeroInitVkStruct(samplerInfo, VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO);
 
-	samplerInfo.minFilter = m_Description.MinFilter;
-	samplerInfo.magFilter = m_Description.MagFilter;
+	samplerInfo.minFilter = Convert(m_Description.MinFilter);
+	samplerInfo.magFilter = Convert(m_Description.MagFilter);
 	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;

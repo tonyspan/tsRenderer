@@ -7,17 +7,15 @@
 #include "Enums.h"
 
 #include <string_view>
-#include <vector>
+#include <array>
 
 struct TextureDescription
 {
-	uint32_t Width;
-	uint32_t Height;
+	uint32_t Width = 0;
+	uint32_t Height = 0;
 
-	uint32_t MipLevels;
-	Format Format;
-
-	TextureDescription();
+	bool GenerateMipLevels = true;
+	Format Format = Format::UNDEFINED;
 };
 
 // TODO: Rework Texture, Texture2D, TextureCube classes
@@ -25,12 +23,16 @@ struct TextureDescription
 class Texture
 {
 public:
-	Texture(TextureType type);
+	Texture(TextureType type, const TextureDescription& desc);
 	virtual ~Texture() = default;
 
 	TextureType GetType() const;
+	uint32_t GenerateMips(uint32_t width, uint32_t height);
+
+	const TextureDescription& GetDescription() const;
 private:
 	TextureType m_Type;
+	TextureDescription m_Description;
 };
 
 class Image2D;
@@ -52,15 +54,13 @@ private:
 private:
 	Ref<Image2D> m_Image;
 	Ref<Sampler> m_Sampler;
-
-	TextureDescription m_Description;
 };
 
 class TextureCube : public Texture
 {
 public:
 	// For Cubemaps
-	static Ref<TextureCube> Create(const std::vector<std::string_view>& paths);
+	static Ref<TextureCube> Create(const std::array<std::string_view, 6>& paths);
 
 	TextureCube(void** data, const TextureDescription& desc);
 	~TextureCube();
@@ -73,6 +73,4 @@ private:
 private:
 	Ref<Image2D> m_Image;
 	Ref<Sampler> m_Sampler;
-
-	TextureDescription m_Description;
 };

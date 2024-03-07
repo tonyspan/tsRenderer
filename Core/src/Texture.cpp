@@ -15,7 +15,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-constexpr uint32_t s_MaxCubemapImages = 6;
+#include <span>
 
 static uint8_t* LoadFromFile(const std::string_view filename, uint32_t& width, uint32_t& height, uint32_t& channels)
 {
@@ -33,7 +33,7 @@ static uint8_t* LoadFromFile(const std::string_view filename, uint32_t& width, u
 }
 
 template<typename T>
-static Ref<T> TryCreate(const std::vector<std::string_view>& paths, TextureDescription& desc)
+static Ref<T> TryCreate(const std::span<const std::string_view> paths, TextureDescription& desc)
 {
 	if (paths.empty())
 		return nullptr;
@@ -47,7 +47,7 @@ static Ref<T> TryCreate(const std::vector<std::string_view>& paths, TextureDescr
 	uint32_t& height = desc.Height;
 	for (size_t i = 0; i < paths.size(); i++)
 	{
-		const auto& path = paths.at(i);
+		const auto& path = paths[i];
 
 		data[i] = LoadFromFile(path, width, height, channels);
 
@@ -91,8 +91,8 @@ static Ref<T> TryCreate(const std::vector<std::string_view>& paths, TextureDescr
 	return nullptr;
 }
 
-Texture::Texture(TextureType type)
-	: m_Type(type)
+Texture::Texture(TextureType type, const TextureDescription& desc)
+	: m_Type(type), m_Description(desc)
 {
 }
 
@@ -101,10 +101,14 @@ TextureType Texture::GetType() const
 	return m_Type;
 }
 
-TextureDescription::TextureDescription()
-	: Width(0), Height(0), MipLevels(0)
-	, Format(Format::UNDEFINED)
+uint32_t Texture::GenerateMips(uint32_t width, uint32_t height)
 {
+	return static_cast<uint32_t>(glm::floor(std::log2(glm::max(width, height)))) + 1;
+}
+
+const TextureDescription& Texture::GetDescription() const
+{
+	return m_Description;
 }
 
 Ref<Texture2D> Texture2D::Create(const std::string_view path)
@@ -112,13 +116,13 @@ Ref<Texture2D> Texture2D::Create(const std::string_view path)
 	TextureDescription desc;
 	desc.Format = Format::RGBA_8_SRGB;
 
-	std::vector<std::string_view> paths(1, path);
+	std::array<std::string_view, 1> paths = { path };
 
 	return TryCreate<Texture2D>(paths, desc);
 }
 
 Texture2D::Texture2D(void** data, const TextureDescription& desc)
-	: Texture(TextureType::TEXTURE), m_Description(desc)
+	: Texture(TextureType::TEXTURE, desc)
 {
 	CreateTexture(data);
 	CreateSampler();
@@ -143,29 +147,28 @@ const Sampler& Texture2D::GetSampler() const
 void Texture2D::CreateTexture(void** data)
 {
 	ASSERT(data && data[0]);
-	ASSERT(m_Description.Width != 0 && m_Description.Height != 0);
 
-	const uint32_t width = m_Description.Width;
-	const uint32_t height = m_Description.Height;
+	const auto& texDesc = Texture::GetDescription();
+	const uint32_t width = texDesc.Width;
+	const uint32_t height = texDesc.Height;
 
-	VkDeviceSize imageSize = width * height * FormatBytesPerPixel(m_Description.Format);
+	ASSERT(width != 0 && height != 0);
 
-	m_Description.MipLevels = static_cast<uint32_t>(glm::floor(std::log2(glm::max(width, height)))) + 1;
+	static constexpr uint32_t s_ImageCount = 1;
+
+	VkDeviceSize imageSize = width * height * FormatBytesPerPixel(texDesc.Format);
 
 	Scope<Buffer> stagingBuffer = Buffer::CreateStaging(imageSize);
-	stagingBuffer->SetData(data[0], imageSize);
-
-	const VkFormat vkFormat = Convert(m_Description.Format);
-	static constexpr uint32_t s_ImageCount = 1;
+	stagingBuffer->SetData(data[0]);
 
 	ImageDescription desc;
 
 	desc.Width = width;
 	desc.Height = height;
-	desc.MipLevels = m_Description.MipLevels;
+	desc.MipLevels = texDesc.GenerateMipLevels ? GenerateMips(width, height) : 1;
 	desc.ImageCount = s_ImageCount;
-	desc.NumSamples = VK_SAMPLE_COUNT_1_BIT;
-	desc.Format = vkFormat;
+	desc.MSAAnumSamples = 1;
+	desc.Format = texDesc.Format;
 	desc.ImageUsage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 	desc.ImageCreateFlags = 0;
 	desc.ImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -174,22 +177,24 @@ void Texture2D::CreateTexture(void** data)
 
 	m_Image = Image2D::Create(desc);
 
-	m_Image->TransitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	m_Image->TransitionImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 	m_Image->CopyFrom(*stagingBuffer);
 }
 
 void Texture2D::CreateSampler()
 {
+	const auto& texDesc = Texture::GetDescription();
+
 	SamplerDescription desc;
 
-	desc.MipLevels = m_Description.MipLevels;
-	desc.MagFilter = VK_FILTER_NEAREST;
-	desc.MinFilter = VK_FILTER_NEAREST;
+	desc.MipLevels = texDesc.GenerateMipLevels ? GenerateMips(texDesc.Width, texDesc.Height) : 1;
+	desc.MagFilter = Filter::NEAREST;
+	desc.MinFilter = Filter::NEAREST;
 
 	m_Sampler = Sampler::Create(desc);
 }
 
-Ref<TextureCube> TextureCube::Create(const std::vector<std::string_view>& paths)
+Ref<TextureCube> TextureCube::Create(const std::array<std::string_view, 6>& paths)
 {
 	TextureDescription desc;
 	desc.Format = Format::RGBA_8_SRGB;
@@ -198,7 +203,7 @@ Ref<TextureCube> TextureCube::Create(const std::vector<std::string_view>& paths)
 }
 
 TextureCube::TextureCube(void** data, const TextureDescription& desc)
-	: Texture(TextureType::CUBE), m_Description(desc)
+	: Texture(TextureType::CUBE, desc)
 {
 	CreateCube(data);
 	CreateSampler();
@@ -223,34 +228,35 @@ const Sampler& TextureCube::GetSampler() const
 void TextureCube::CreateCube(void** data)
 {
 	ASSERT(data);
-	ASSERT(m_Description.Width != 0 && m_Description.Height != 0);
 
-	const uint32_t width = m_Description.Width;
-	const uint32_t height = m_Description.Height;
+	const auto& texDesc = Texture::GetDescription();
+	const uint32_t width = texDesc.Width;
+	const uint32_t height = texDesc.Height;
 
-	VkDeviceSize imageSize = width * height * FormatBytesPerPixel(m_Description.Format);
-	VkDeviceSize totalImageSize = imageSize * s_MaxCubemapImages;
+	ASSERT(width != 0 && height != 0);
 
-	m_Description.MipLevels = static_cast<uint32_t>(glm::floor(std::log2(glm::max(width, height)))) + 1;
+	static constexpr uint32_t s_ImageCount = 6;
+
+
+	VkDeviceSize imageSize = width * height * FormatBytesPerPixel(texDesc.Format);
+	VkDeviceSize totalImageSize = imageSize * s_ImageCount;
 
 	Scope<Buffer> stagingBuffer = Buffer::CreateStaging(totalImageSize);
 
-	for (uint32_t i = 0; i < s_MaxCubemapImages; i++)
+	for (uint32_t i = 0; i < s_ImageCount; i++)
 	{
 		if (data[i])
 			stagingBuffer->SetData(data[i], imageSize, imageSize * i);
 	}
 
-	const VkFormat vkFormat = Convert(m_Description.Format);
-
 	ImageDescription desc;
 
 	desc.Width = width;
 	desc.Height = height;
-	desc.MipLevels = m_Description.MipLevels;
-	desc.ImageCount = s_MaxCubemapImages;
-	desc.NumSamples = VK_SAMPLE_COUNT_1_BIT;
-	desc.Format = vkFormat;
+	desc.MipLevels = texDesc.GenerateMipLevels ? GenerateMips(width, height) : 1;
+	desc.ImageCount = s_ImageCount;
+	desc.MSAAnumSamples = 1;
+	desc.Format = texDesc.Format;
 	desc.ImageUsage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 	desc.ImageCreateFlags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
 	desc.ImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -259,17 +265,19 @@ void TextureCube::CreateCube(void** data)
 
 	m_Image = Image2D::Create(desc);
 
-	m_Image->TransitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	m_Image->TransitionImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 	m_Image->CopyFrom(*stagingBuffer);
 }
 
 void TextureCube::CreateSampler()
 {
+	const auto& texDesc = Texture::GetDescription();
+
 	SamplerDescription desc;
 
-	desc.MipLevels = m_Description.MipLevels;
-	desc.MagFilter = VK_FILTER_NEAREST;
-	desc.MinFilter = VK_FILTER_NEAREST;
+	desc.MipLevels = texDesc.GenerateMipLevels ? GenerateMips(texDesc.Width, texDesc.Height) : 1;
+	desc.MagFilter = Filter::NEAREST;
+	desc.MinFilter = Filter::NEAREST;
 
 	m_Sampler = Sampler::Create(desc);
 }

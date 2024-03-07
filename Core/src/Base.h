@@ -33,3 +33,15 @@ inline Ref<T> RefAs(Ref<Other>&& other)
 };
 
 #define BIND_FUNC(fn) [this](auto&&... args) -> decltype(auto) { return this->fn(std::forward<decltype(args)>(args)...); }
+
+#define DELETE_COPY_SEMANTICS(CLASS) \
+CLASS(const CLASS&) = delete; \
+CLASS& operator=(const CLASS&) = delete;
+
+#define DELETE_MOVE_SEMANTICS(CLASS) \
+CLASS(CLASS&&) = delete; \
+CLASS& operator=(CLASS&&) = delete;
+
+#define DELETE_COPY_AND_MOVE(CLASS) \
+DELETE_COPY_SEMANTICS(CLASS) \
+DELETE_MOVE_SEMANTICS(CLASS)

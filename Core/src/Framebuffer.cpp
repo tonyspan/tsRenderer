@@ -2,6 +2,7 @@
 
 #include "Log.h"
 
+#include "Context.h"
 #include "Device.h"
 #include "Image.h"
 #include "RenderPass.h"
@@ -11,26 +12,20 @@
 
 #include <array>
 
-FramebufferDescription::FramebufferDescription()
-	: Width(0), Height(0), RenderPass(nullptr)
-	, Format(VK_FORMAT_UNDEFINED), ClearColor({ 0.0f, 0.0f, 0.0f, 1.0f })
+Ref<Framebuffer> Framebuffer::Create(const FramebufferDescription& desc)
 {
+	return CreateRef<Framebuffer>(desc);
 }
 
-Ref<Framebuffer> Framebuffer::Create(Device& device, const FramebufferDescription& desc)
-{
-	return CreateRef<Framebuffer>(device, desc);
-}
-
-Framebuffer::Framebuffer(Device& device, const FramebufferDescription& desc)
-	: m_Device(device), m_Description(desc)
+Framebuffer::Framebuffer(const FramebufferDescription& desc)
+	: m_Description(desc)
 {
 	CreateFramebuffer();
 }
 
 Framebuffer::~Framebuffer()
 {
-	vkDestroyFramebuffer(m_Device.GetHandle(), Handle::GetHandle(), nullptr);
+	vkDestroyFramebuffer(Context::GetDevice().GetHandle(), Handle::GetHandle(), nullptr);
 }
 
 const FramebufferDescription& Framebuffer::GetDescription() const
@@ -61,7 +56,7 @@ void Framebuffer::CreateFramebuffer()
 	framebufferInfo.height = m_Description.Height;
 	framebufferInfo.layers = 1;
 
-	VkResult result = vkCreateFramebuffer(m_Device.GetHandle(), &framebufferInfo, nullptr, &Handle::GetHandle());
+	VkResult result = vkCreateFramebuffer(Context::GetDevice().GetHandle(), &framebufferInfo, nullptr, &Handle::GetHandle());
 	VK_CHECK_RESULT(result);
 	ASSERT(Handle::GetHandle(), "Framebuffer creation failed");
 }

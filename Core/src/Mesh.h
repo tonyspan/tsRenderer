@@ -5,7 +5,7 @@
 #include "Vertex.h"
 
 #include <string_view>
-#include <vector>
+#include <span>
 
 class Buffer;
 
@@ -13,9 +13,11 @@ class Mesh
 {
 public:
 	static Ref<Mesh> Create(const std::string_view file);
-	static Ref<Mesh> Create(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices);
+	static Ref<Mesh> Create(const std::span<Vertex> vertices, const std::span<uint32_t> indices);
+	static Ref<Mesh> Create(const Ref<Buffer>& vb, const Ref<Buffer>& ib);
 
-	Mesh(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices);
+	Mesh(const std::span<Vertex> vertices, const std::span<uint32_t> indices);
+	Mesh(const Ref<Buffer>& vb, const Ref<Buffer>& ib);
 	~Mesh();
 
 	void SetName(const std::string_view name);
@@ -30,6 +32,6 @@ private:
 	Ref<Buffer> m_VertexBuffer;
 	Ref<Buffer> m_IndexBuffer;
 
-	std::vector<Vertex> m_Vertices;
-	std::vector<uint32_t> m_Indices;
+	// TODO: Temporary, probably IndexBuffer class is needed
+	uint32_t m_Count = 0;
 };

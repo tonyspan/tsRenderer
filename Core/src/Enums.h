@@ -6,10 +6,11 @@ enum class Format : int
 {
 	UNDEFINED = 0,
 
-	// Used in Image
+	// Color Attachments
 
 	// 8 bits/component
 	RGBA_8_SRGB,
+	BGRA_8_SRGB,
 
 	// Used in Vertex
 
@@ -22,11 +23,22 @@ enum class Format : int
 	// 32 bits/component
 	RGB_32_SFLOAT,
 	// 32 bits/component
-	RG_32_SFLOAT
+	RG_32_SFLOAT,
+
+	// Depth
+
+	D32_SFLOAT
 };
 
 VkFormat Convert(Format format);
 uint32_t FormatBytesPerPixel(Format format);
+
+// Unused
+enum class MSAASamples
+{
+};
+
+VkSampleCountFlagBits Convert(uint32_t msaaNumSamples);
 
 enum class StageFlag : int
 {
@@ -130,3 +142,13 @@ enum class TextureType : int
 	TEXTURE,
 	CUBE
 };
+
+enum class Filter
+{
+	UNDEFINED = 0,
+
+	NEAREST,
+	LINEAR
+};
+
+VkFilter Convert(Filter filter);

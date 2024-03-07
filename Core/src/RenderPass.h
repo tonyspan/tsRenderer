@@ -4,27 +4,27 @@
 
 #include "VK.h"
 
-class Device;
-class Swapchain;
+#include <span>
+
 class CommandBuffer;
 class Framebuffer;
+class Image2D;
 
-class RenderPassDescription
+struct RenderPassDescription
 {
+	std::span<const Image2D* const> Attachments;
 };
 
 class RenderPass : public Handle<VkRenderPass>
 {
 public:
-	static Ref<RenderPass> Create(const Device& device, const Swapchain& swapchain);
+	static Ref<RenderPass> Create(const RenderPassDescription& desc);
 
-	RenderPass(const Device& device, const Swapchain& swapchain);
+	RenderPass(const RenderPassDescription& desc);
 	~RenderPass();
 
 	void Begin(const CommandBuffer& commandBuffer, const Framebuffer& framebuffer);
 	void End(const CommandBuffer& commandBuffer);
 private:
-	void CreateRenderPass(const Swapchain& swapchain);
-private:
-	const Device& m_Device;
+	void CreateRenderPass(const RenderPassDescription& desc);
 };

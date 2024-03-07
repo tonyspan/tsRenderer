@@ -16,4 +16,4 @@ bin-int/
 
 # Directories
 scripts/__pycache__
-3rdparty/SDL/
+3rdparty/SDL/**

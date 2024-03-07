@@ -12,6 +12,8 @@ VkFormat Convert(Format format)
 	{
 	case Format::RGBA_8_SRGB:
 		return VK_FORMAT_R8G8B8A8_SRGB;
+	case Format::BGRA_8_SRGB:
+		return VK_FORMAT_B8G8R8A8_SRGB;
 	case Format::R8_UINT:
 		return VK_FORMAT_R8_UINT;
 	case Format::R32_UINT:
@@ -24,6 +26,8 @@ VkFormat Convert(Format format)
 		return VK_FORMAT_R32G32B32_SFLOAT;
 	case Format::RG_32_SFLOAT:
 		return VK_FORMAT_R32G32_SFLOAT;
+	case Format::D32_SFLOAT:
+		return VK_FORMAT_D32_SFLOAT;
 	default:
 		break;
 	}
@@ -44,6 +48,35 @@ uint32_t FormatBytesPerPixel(Format format)
 
 	ASSERT(false, "Unknown format type");
 	return 0;
+}
+
+static bool CheckMSAASamples(uint32_t msaaNumSamples)
+{
+	if ((msaaNumSamples == 1) || (msaaNumSamples == 2) || (msaaNumSamples == 4) || (msaaNumSamples == 8))
+		return true;
+
+	return false;
+}
+
+VkSampleCountFlagBits Convert(uint32_t msaaNumSamples)
+{
+	ASSERT(CheckMSAASamples(msaaNumSamples), "Invalid MSAA sample count");
+
+#define MSAA_NUM_SAMPLE_CASE(msaaNumSample) \
+	case msaaNumSample: return VK_SAMPLE_COUNT_##msaaNumSample##_BIT
+
+	switch (msaaNumSamples)
+	{
+		MSAA_NUM_SAMPLE_CASE(1);
+		MSAA_NUM_SAMPLE_CASE(2);
+		MSAA_NUM_SAMPLE_CASE(4);
+		MSAA_NUM_SAMPLE_CASE(8);
+	default:
+		break;
+	}
+
+	ASSERT(false, "Unknown MSAA sample count");
+	return VK_SAMPLE_COUNT_FLAG_BITS_MAX_ENUM;
 }
 
 VkShaderStageFlagBits Convert(StageFlag stage)
@@ -196,4 +229,20 @@ VkPrimitiveTopology Convert(PrimitiveTopology topology)
 
 	ASSERT(false, "Unknown PrimitiveTopology");
 	return VK_PRIMITIVE_TOPOLOGY_MAX_ENUM;
+}
+
+VkFilter Convert(Filter filter)
+{
+	switch (filter)
+	{
+	case Filter::NEAREST:
+		return VK_FILTER_NEAREST;
+	case Filter::LINEAR:
+		return VK_FILTER_LINEAR;
+	default:
+		break;
+	}
+
+	ASSERT(false, "Unknown Filter");
+	return VK_FILTER_MAX_ENUM;
 }

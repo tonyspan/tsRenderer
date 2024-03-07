@@ -10,6 +10,8 @@
 
 #include "Input.h"
 
+#include "Camera.h"
+
 #include "Buffer.h"
 #include "Layout.h"
 

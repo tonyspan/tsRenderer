@@ -105,17 +105,27 @@ void Buffer::Init(const BufferDescription& desc)
 
 void Buffer::SetData(const void* data, VkDeviceSize size, VkDeviceSize offset)
 {
-	ASSERT(data);
-	ASSERT(size <= m_Description.Size);
 	ASSERT(m_IsInitialized, "Buffer isn't initialized");
+	ASSERT(data);
+	ASSERT(size > 0 && size <= m_Description.Size);
 
 	const auto& device = Context::GetDevice().GetHandle();
 
 	void* mappedData = nullptr;
 
-	vkMapMemory(device, m_Memory, 0, m_Description.Size, 0, (void**)&mappedData);
-	memcpy(static_cast<char*>(mappedData) + offset, data, size);
+	vkMapMemory(device, m_Memory, 0, size, 0, (void**)&mappedData);
+	memcpy(static_cast<char*>(mappedData) + offset, data, static_cast<size_t>(size));
 	vkUnmapMemory(device, m_Memory);
+}
+
+void Buffer::SetData(const void* data)
+{
+	SetData(data, m_Description.Size);
+}
+
+const BufferDescription& Buffer::GetDescription() const
+{
+	return m_Description;
 }
 
 VkDeviceMemory Buffer::GetMemory() const

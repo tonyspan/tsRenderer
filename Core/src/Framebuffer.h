@@ -4,42 +4,36 @@
 
 #include "VK.h"
 
+#include "Enums.h"
+
 #include <glm/glm.hpp>
 
 #include <span>
-
-class Device;
 
 class Image2D;
 class RenderPass;
 
 struct FramebufferDescription
 {
-	uint32_t Width;
-	uint32_t Height;
-	glm::vec4 ClearColor;
+	uint32_t Width = 0;
+	uint32_t Height = 0;
+	glm::vec4 ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
 
-	RenderPass* RenderPass;
-	std::span<Image2D*> Attachments;
-
-	VkFormat Format;
-
-	FramebufferDescription();
+	RenderPass* RenderPass = nullptr;
+	std::span<const Image2D* const> Attachments;
 };
 
 class Framebuffer : public Handle<VkFramebuffer>
 {
 public:
-	static Ref<Framebuffer> Create(Device& device, const FramebufferDescription& desc);
+	static Ref<Framebuffer> Create(const FramebufferDescription& desc);
 
-	Framebuffer(Device& device, const FramebufferDescription& desc);
+	Framebuffer(const FramebufferDescription& desc);
 	~Framebuffer();
 
 	const FramebufferDescription& GetDescription() const;
 private:
 	void CreateFramebuffer();
 private:
-	Device& m_Device;
-
 	FramebufferDescription m_Description;
 };

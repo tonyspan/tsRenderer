@@ -7,13 +7,8 @@ import Utils;
 
 def SDLDownload(location, version):
 
-    # TODO: Maintain 2 places with this info
-    target = f"{location}" + "/SDL2-" + f"{version}"
-
-    if os.path.exists(target):
-        # print("Required version already exists")
-        target = Utils.NormalizeAndGetAbsolutePath(target)
-        print(target)
+    if os.path.exists(f"{location}/SDL2-{version}"):
+        print("SDL2 required version already exists")
         return
 
     url = "";
@@ -37,9 +32,6 @@ def SDLDownload(location, version):
 
     # Remove .zip file
     os.remove(zipPath)
-
-    target = Utils.NormalizeAndGetAbsolutePath(target)
-    print(target)
 
 # Run
 SDLDownload(sys.argv[1], sys.argv[2])

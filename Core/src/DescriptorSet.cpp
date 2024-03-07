@@ -13,216 +13,131 @@
 
 #include <vulkan/vulkan.h>
 
-#pragma region DescriptorSetLayout
-
-DescriptorSetLayoutBinding::DescriptorSetLayoutBinding()
-	: Binding(0), Type(DescriptorType::UNDEFINED), StageFlags(StageFlag::UNDEFINED)
+const DescriptorSetElement& DescriptorSetLayout::GetElement(uint32_t index) const
 {
+	const size_t idx = static_cast<size_t>(index);
+	ASSERT(idx >= 0 && idx < m_Elements.size());
+
+	return m_Elements[idx];
 }
 
-DescriptorSetLayoutBinding::DescriptorSetLayoutBinding(uint32_t binding, DescriptorType type, StageFlag flags)
-	: Binding(binding), Type(type), StageFlags(flags)
+const std::vector<DescriptorSetElement>& DescriptorSetLayout::GetElements() const
 {
+	return m_Elements;
 }
 
-Ref<DescriptorSetLayout> DescriptorSetLayout::Create(const std::vector<DescriptorSetLayoutBinding>& bindings)
+uint32_t DescriptorSetLayout::GetElementCount() const
 {
-	return CreateRef<DescriptorSetLayout>(bindings);
+	return static_cast<uint32_t>(m_Elements.size());
 }
 
-DescriptorSetLayout::DescriptorSetLayout(const std::vector<DescriptorSetLayoutBinding>& bindings)
+Ref<DescriptorSet> DescriptorSet::Create(const DescriptorSetLayout& layout)
 {
-	std::vector<VkDescriptorSetLayoutBinding> vkBindings(bindings.size());
+	ASSERT(!layout.GetElements().empty(), "DescriptorSetLayout is empty");
 
-	for (uint32_t i = 0; i < bindings.size(); i++)
-	{
-		auto& binding = bindings[i];
-
-		vkBindings[i].binding = binding.Binding;
-		vkBindings[i].descriptorType = Convert(binding.Type);
-		vkBindings[i].descriptorCount = 1;
-		vkBindings[i].stageFlags = Convert(binding.StageFlags);
-	}
-
-	VkDescriptorSetLayoutCreateInfo layoutInfo;
-	ZeroInitVkStruct(layoutInfo, VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO);
-
-	layoutInfo.bindingCount = static_cast<uint32_t>(vkBindings.size());
-	layoutInfo.pBindings = vkBindings.data();
-
-	VkResult result = vkCreateDescriptorSetLayout(Context::GetDevice().GetHandle(), &layoutInfo, nullptr, &Handle::GetHandle());
-	VK_CHECK_RESULT(result);
-	ASSERT(Handle::GetHandle(), "DescriptorSetLayout creation failed");
+	return CreateRef<DescriptorSet>(layout);
 }
 
-DescriptorSetLayout::~DescriptorSetLayout()
+DescriptorSet::DescriptorSet(const DescriptorSetLayout& layout)
+	: m_DescriptorSetLayout(VK_NULL_HANDLE)
 {
-	vkDestroyDescriptorSetLayout(Context::GetDevice().GetHandle(), Handle::GetHandle(), nullptr);
-}
-
-#pragma endregion
-
-#pragma region DescriptorSet
-
-DescriptorSetElement::DescriptorSetElement()
-	: Binding(0), Tyype(DescriptorSetElement::Type::NONE)
-	, Size(0), Tex(nullptr)
-{
-}
-
-DescriptorSetElement::DescriptorSetElement(uint32_t binding, DescriptorSetElement::Type type, uint32_t size, const Texture* texture)
-	: Binding(binding), Tyype(type), Size(size), Tex(texture)
-{
-}
-
-DescriptorSetDescription::DescriptorSetDescription()
-	: DescSetLayout(nullptr)
-{
-}
-
-Ref<DescriptorSet> DescriptorSet::Create(const DescriptorSetDescription& desc)
-{
-	return CreateRef<DescriptorSet>(desc);
-}
-
-DescriptorSet::DescriptorSet(const DescriptorSetDescription& desc)
-{
-	const uint32_t imageCount = Context::GetSwapchain().GetImageCount();
-	const auto& device = Context::GetDevice().GetHandle();
-	const auto& descriptorPool = Context::GetDescriptorPool();
-
-	const auto& elements = desc.Elements;
-	const auto& layout = desc.DescSetLayout;
-
-	m_UniformBufferData.resize(elements.size());
-	m_DescriptorSets.resize(imageCount);
-
-	for (uint32_t i = 0; const auto & element : elements)
-	{
-		auto& ubData = m_UniformBufferData.at(i);
-
-		ubData.UniformBuffers.resize(imageCount);
-
-		if (element.Tyype == DescriptorSetElement::Type::UNIFORM)
-		{
-			for (uint32_t j = 0; j < imageCount; j++)
-				ubData.UniformBuffers[j] = Buffer::CreateUniform(element.Size);
-
-			ubData.ToFree = true;
-		}
-
-		i++;
-	}
-
-	std::vector<VkDescriptorSetLayout> layouts(imageCount, layout->GetHandle());
-
-	VkDescriptorSetAllocateInfo allocInfo;
-	ZeroInitVkStruct(allocInfo, VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO);
-
-	allocInfo.descriptorPool = descriptorPool.GetHandle();
-	allocInfo.descriptorSetCount = static_cast<uint32_t>(layouts.size());
-	allocInfo.pSetLayouts = layouts.data();
-
-	VkResult result = vkAllocateDescriptorSets(device, &allocInfo, m_DescriptorSets.data());
-	VK_CHECK_RESULT(result);
-
-	struct DescriptorSetData
-	{
-		VkWriteDescriptorSet DescriptorWrite;
-		VkDescriptorBufferInfo BufferInfo;
-		VkDescriptorImageInfo ImageInfo;
-	};
-
-	std::vector<DescriptorSetData> descriptorData(elements.size());
-	for (uint32_t i = 0; i < imageCount; i++)
-	{
-		for (size_t j = 0; j < elements.size(); j++)
-		{
-			auto& element = elements[j];
-
-			auto& descriptorWrite = descriptorData[j].DescriptorWrite;
-			auto& bufferInfo = descriptorData[j].BufferInfo;
-			auto& imageInfo = descriptorData[j].ImageInfo;
-
-			ZeroInitVkStruct(descriptorWrite, VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET);
-
-			descriptorWrite.dstSet = m_DescriptorSets[i];
-			descriptorWrite.dstBinding = element.Binding;
-			descriptorWrite.dstArrayElement = 0;
-			descriptorWrite.descriptorCount = 1;
-
-			switch (element.Tyype)
-			{
-			case DescriptorSetElement::Type::UNIFORM:
-			{
-				bufferInfo.buffer = m_UniformBufferData.at(j).UniformBuffers.at(i)->GetHandle();
-				bufferInfo.offset = 0;
-				bufferInfo.range = element.Size;
-
-				descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-				descriptorWrite.pBufferInfo = &bufferInfo;
-
-				break;
-			}
-			case DescriptorSetElement::Type::SAMPLER:
-			{
-				imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-				if (element.Tex->GetType() == TextureType::TEXTURE)
-				{
-					const Texture2D* texture = (const Texture2D*)element.Tex;
-					imageInfo.imageView = texture->GetImage().GetImageViewHandle();
-					imageInfo.sampler = texture->GetSampler().GetHandle();
-				}
-				else
-				{
-					const TextureCube* texture = (const TextureCube*)element.Tex;
-					imageInfo.imageView = texture->GetImage().GetImageViewHandle();
-					imageInfo.sampler = texture->GetSampler().GetHandle();
-				}
-
-				descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-				descriptorWrite.pImageInfo = &imageInfo;
-
-				break;
-			}
-			default:
-			{
-				ASSERT(false, "Unknown DescriptorSetElement");
-				break;
-			}
-			}
-		}
-
-		for (size_t i = 0; i < descriptorData.size(); i++)
-			vkUpdateDescriptorSets(device, 1, &descriptorData.at(i).DescriptorWrite, 0, nullptr);
-	}
+	CreateDescriptorSetLayout(layout);
+	CreateDescriptorSet();
 }
 
 DescriptorSet::~DescriptorSet()
 {
-	for (auto& ubData : m_UniformBufferData)
+	// No need to explicitly clean up descriptor sets, they will be automatically freed when the descriptor pool is destroyed
+	// vkFreeDescriptorSets(device, descriptorPool, static_cast<uint32_t>(m_DescriptorSets.size()), m_DescriptorSets.data());
+
+	vkDestroyDescriptorSetLayout(Context::GetDevice().GetHandle(), m_DescriptorSetLayout, nullptr);
+}
+
+void DescriptorSet::SetBuffer(uint32_t binding, const Buffer& buffer)
+{
+	ASSERT(binding != ~0);
+
+	const uint32_t imageCount = Context::GetSwapchain().GetImageCount();
+
+	VkDescriptorBufferInfo bufferInfo = {};
+
+	VkWriteDescriptorSet descriptorWrite;
+	ZeroInitVkStruct(descriptorWrite, VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET);
+
+	for (uint32_t i = 0; i < imageCount; i++)
 	{
-		if (ubData.ToFree)
-		{
-			for (auto& buffer : ubData.UniformBuffers)
-				buffer.reset();
-		}
-		else
-		{
-			LOG("Not Freed");
-		}
+		bufferInfo.buffer = buffer.GetHandle();
+		bufferInfo.offset = 0;
+		bufferInfo.range = VK_WHOLE_SIZE;
+
+		descriptorWrite.dstSet = m_DescriptorSets[i];
+		descriptorWrite.dstBinding = binding;
+		descriptorWrite.dstArrayElement = 0;
+
+		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		descriptorWrite.descriptorCount = 1;
+
+		descriptorWrite.pBufferInfo = &bufferInfo;
+
+		vkUpdateDescriptorSets(Context::GetDevice().GetHandle(), 1, &descriptorWrite, 0, nullptr);
 	}
 }
 
-void DescriptorSet::Update(uint32_t slot, void* data, VkDeviceSize size)
+void DescriptorSet::SetTexture(uint32_t binding, const Texture& texture)
 {
-	const uint32_t currentImage = Context::GetSwapchain().GetCurrentImage();
+	ASSERT(binding != ~0);
 
-	ASSERT(!m_DescriptorSets.empty() || !m_UniformBufferData.at(0).UniformBuffers.empty());
-	ASSERT(slot < m_UniformBufferData.size() && currentImage < m_UniformBufferData.at(slot).UniformBuffers.size(), "Index out of bounds");
+	const uint32_t imageCount = Context::GetSwapchain().GetImageCount();
 
-	m_UniformBufferData.at(slot).UniformBuffers.at(currentImage)->SetData(data, size);
+	VkDescriptorImageInfo imageInfo = {};
+	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	VkWriteDescriptorSet descriptorWrite;
+	ZeroInitVkStruct(descriptorWrite, VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET);
+
+	for (uint32_t i = 0; i < imageCount; i++)
+	{
+		switch (texture.GetType())
+		{
+		case TextureType::TEXTURE:
+		{
+			const auto& texture2D = static_cast<const Texture2D&>(texture);
+			imageInfo.imageView = texture2D.GetImage().GetImageViewHandle();
+			imageInfo.sampler = texture2D.GetSampler().GetHandle();
+
+			break;
+		}
+		case TextureType::CUBE:
+		{
+			const auto& textureCube = static_cast<const TextureCube&>(texture);
+			imageInfo.imageView = textureCube.GetImage().GetImageViewHandle();
+			imageInfo.sampler = textureCube.GetSampler().GetHandle();
+
+			break;
+		}
+		default:
+		{
+			ASSERT(false);
+			break;
+		}
+		}
+
+		descriptorWrite.dstSet = m_DescriptorSets[i];
+		descriptorWrite.dstBinding = binding;
+		descriptorWrite.dstArrayElement = 0;
+
+		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		descriptorWrite.descriptorCount = 1;
+
+		descriptorWrite.pImageInfo = &imageInfo;
+
+		vkUpdateDescriptorSets(Context::GetDevice().GetHandle(), 1, &descriptorWrite, 0, nullptr);
+	}
+}
+
+const VkDescriptorSetLayout DescriptorSet::GetLayout() const
+{
+	return m_DescriptorSetLayout;
 }
 
 VkDescriptorSet DescriptorSet::GetDescriptorSet() const
@@ -231,41 +146,46 @@ VkDescriptorSet DescriptorSet::GetDescriptorSet() const
 	return m_DescriptorSets.at(currentFrame);
 }
 
-#pragma endregion
-
-void DescriptorSet2::CreateDescriptorSet(const DescriptorSetLayout2& layout)
+void DescriptorSet::CreateDescriptorSetLayout(const DescriptorSetLayout& layout)
 {
-	std::vector<VkDescriptorSetLayoutBinding> vkBindings(layout.GetElementCount());
+	std::vector<VkDescriptorSetLayoutBinding> bindings(layout.GetElementCount());
 
 	for (uint32_t i = 0; i < layout.GetElementCount(); i++)
 	{
-		auto& binding = layout.GetElements()[i];
+		const auto& layoutElement = layout.GetElement(i);
 
-		vkBindings[i].binding = binding.Binding;
-		vkBindings[i].descriptorType = Convert(binding.Type);
-		vkBindings[i].descriptorCount = 1;
-		vkBindings[i].stageFlags = Convert(binding.StageFlags);
+		bindings[i].binding = layoutElement.Binding;
+		bindings[i].descriptorType = Convert(layoutElement.Type);
+		bindings[i].descriptorCount = 1;
+		bindings[i].stageFlags = Convert(layoutElement.Stage);
 	}
 
 	VkDescriptorSetLayoutCreateInfo layoutInfo;
 	ZeroInitVkStruct(layoutInfo, VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO);
 
-	layoutInfo.bindingCount = static_cast<uint32_t>(vkBindings.size());
-	layoutInfo.pBindings = vkBindings.data();
+	layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+	layoutInfo.pBindings = bindings.data();
 
-	VkDescriptorSetLayout vkLayout;
-
-	VkResult result = vkCreateDescriptorSetLayout(Context::GetDevice().GetHandle(), &layoutInfo, nullptr, &vkLayout);
+	VkResult result = vkCreateDescriptorSetLayout(Context::GetDevice().GetHandle(), &layoutInfo, nullptr, &m_DescriptorSetLayout);
 	VK_CHECK_RESULT(result);
-	ASSERT(vkLayout, "DescriptorSetLayout creation failed");
+	ASSERT(m_DescriptorSetLayout, "DesriptorSetLayout creation failed");
+}
+
+void DescriptorSet::CreateDescriptorSet()
+{
+	const uint32_t imageCount = Context::GetSwapchain().GetImageCount();
+
+	std::vector<VkDescriptorSetLayout> layouts(imageCount, m_DescriptorSetLayout);
 
 	VkDescriptorSetAllocateInfo allocInfo;
 	ZeroInitVkStruct(allocInfo, VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO);
 
 	allocInfo.descriptorPool = Context::GetDescriptorPool().GetHandle();
-	allocInfo.descriptorSetCount = 1;
-	allocInfo.pSetLayouts = &vkLayout;
+	allocInfo.descriptorSetCount = static_cast<uint32_t>(layouts.size());
+	allocInfo.pSetLayouts = layouts.data();
 
-	result = vkAllocateDescriptorSets(Context::GetDevice().GetHandle(), &allocInfo, m_DescriptorSets.data());
+	m_DescriptorSets.resize(imageCount);
+
+	VkResult result = vkAllocateDescriptorSets(Context::GetDevice().GetHandle(), &allocInfo, m_DescriptorSets.data());
 	VK_CHECK_RESULT(result);
 }

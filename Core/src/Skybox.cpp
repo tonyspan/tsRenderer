@@ -3,12 +3,12 @@
 #include "Mesh.h"
 #include "Texture.h"
 
-Ref<Skybox> Skybox::Create(const std::string_view meshPath, const std::vector<std::string_view>& paths)
+Ref<Skybox> Skybox::Create(const std::string_view meshPath, const std::array<std::string_view, 6>& paths)
 {
 	return CreateRef<Skybox>(meshPath, paths);
 }
 
-Skybox::Skybox(const std::string_view meshPath, const std::vector<std::string_view>& paths)
+Skybox::Skybox(const std::string_view meshPath, const std::array<std::string_view, 6>& paths)
 	: m_Mesh(Mesh::Create(meshPath)), m_Texture(TextureCube::Create(paths))
 {
 }

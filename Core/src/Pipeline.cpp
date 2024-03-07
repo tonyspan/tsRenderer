@@ -56,13 +56,12 @@ void Pipeline::CreatePipeline(const PipelineDescription& desc)
 	const auto& swapchainDesc = Context::GetSwapchain().GetDescription();
 	const auto& renderPass = Context::GetSwapchain().GetRenderPass();
 
-	// For now Sandbox project requires the old way of getting Vertex stuff
-#define SANDBOX_PROJECT 0
-#if SANDBOX_PROJECT
+#define OLD_WAY 0
+#if OLD_WAY
 	const auto& bindingDescription = Vertex::GetBindingDescription();
 	const auto& attributeDescriptions = Vertex::GetAttributeDescriptions();
 #else
-	const auto& bufferLayout = desc.BufferLayout;
+	const auto bufferLayout = desc.BufferLayout;
 
 	//ASSERT(bufferLayout, "BufferLayout must be valid");
 
@@ -77,14 +76,17 @@ void Pipeline::CreatePipeline(const PipelineDescription& desc)
 		bindingDescription.stride = bufferLayout->GetStride();
 		bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-		attributeDescriptions.resize(bufferLayoutElements.size());
-
+		attributeDescriptions.reserve(bufferLayoutElements.size());
 		for (uint32_t i = 0; auto & elem : bufferLayoutElements)
 		{
-			attributeDescriptions[i].binding = 0;
-			attributeDescriptions[i].location = i;
-			attributeDescriptions[i].format = Convert(elem.Format);
-			attributeDescriptions[i].offset = elem.Offset;
+			VkVertexInputAttributeDescription attributeDescription = {};
+
+			attributeDescription.binding = 0;
+			attributeDescription.location = i;
+			attributeDescription.format = Convert(elem.Format);
+			attributeDescription.offset = elem.Offset;
+
+			attributeDescriptions.push_back(attributeDescription);
 
 			i++;
 		}
@@ -140,6 +142,7 @@ void Pipeline::CreatePipeline(const PipelineDescription& desc)
 	ZeroInitVkStruct(multisampling, VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO);
 
 	multisampling.sampleShadingEnable = VK_TRUE;
+	multisampling.minSampleShading = 0.2f;
 	multisampling.rasterizationSamples = msaaSamples;
 
 	const bool isTransparencyEnabled = desc.TransparencyEnabled;
@@ -167,7 +170,7 @@ void Pipeline::CreatePipeline(const PipelineDescription& desc)
 
 	if (desc.DescSetLayout)
 	{
-		std::array<VkDescriptorSetLayout, 1> descriptorSetLayout = { desc.DescSetLayout->GetHandle() };
+		std::array<VkDescriptorSetLayout, 1> descriptorSetLayout = { desc.DescSetLayout };
 
 		pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(descriptorSetLayout.size());
 		pipelineLayoutInfo.pSetLayouts = descriptorSetLayout.data();

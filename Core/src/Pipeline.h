@@ -9,13 +9,12 @@
 #include <map>
 #include <string>
 
-class DescriptorSetLayout;
 class Layout;
 
 struct PipelineDescription
 {
 	std::map<StageFlag, std::string> ShaderModules;
-	const DescriptorSetLayout* DescSetLayout;
+	VkDescriptorSetLayout DescSetLayout;
 	const Layout* BufferLayout;
 
 	CompareOp CompareOp;

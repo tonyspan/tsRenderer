@@ -15,6 +15,9 @@ class Cube : public Application
 protected:
 	virtual void OnInit() override
 	{
+		const auto& [width, height] = Application::GetSize();
+		m_Camera = Camera(float(width) / float(height));
+
 		Shader::CompileShaders(GetProjectDirectory() + "/Shaders/");
 
 		Layout layout;
@@ -66,52 +69,39 @@ protected:
 		};
 
 		m_VertexBuffer = Buffer::CreateVertex(vertices.size() * sizeof(Cube::Vertex), vertices.data());
+		m_UniformBuffer = Buffer::CreateUniform(sizeof(Cube::UBO));
 
 		m_Texture = Texture2D::Create("Textures/container.jpg");
 
-		auto dsl = DescriptorSetLayout::Create({
-			DescriptorSetLayoutBinding{ 0, DescriptorType::UNIFORM_BUFFER, StageFlag::VERTEX },
-			DescriptorSetLayoutBinding{ 1, DescriptorType::COMBINED_IMAGE_SAMPLER, StageFlag::FRAGMENT }
+		m_DS = DescriptorSet::Create({
+			{.Name = "UBO", .Binding = 0, .Type = DescriptorType::UNIFORM_BUFFER, .Stage = StageFlag::VERTEX },
+			{.Name = "uTexture", .Binding = 1, .Type = DescriptorType::COMBINED_IMAGE_SAMPLER, .Stage = StageFlag::FRAGMENT }
 			});
 
-		std::vector<DescriptorSetElement> elements =
-		{
-			DescriptorSetElement{ 0, DescriptorSetElement::Type::UNIFORM, sizeof(UBO), (Texture*)nullptr },
-			DescriptorSetElement{ 1, DescriptorSetElement::Type::SAMPLER, 0, m_Texture.get() },
-		};
-
-		{
-			DescriptorSetDescription desc;
-
-			desc.DescSetLayout = dsl.get();
-			desc.Elements = elements;
-
-			m_DS = DescriptorSet::Create(desc);
-		}
+		m_DS->SetBuffer(0, *m_UniformBuffer);
+		m_DS->SetTexture(1, static_cast<const Texture&>(*m_Texture));
 
 		PipelineDescription desc;
 
-		desc.DescSetLayout = dsl.get();
+		desc.DescSetLayout = m_DS->GetLayout();
 		desc.BufferLayout = &layout;
 		desc.ShaderModules = { { StageFlag::VERTEX, "Shaders/Cube.vert.spv" }, { StageFlag::FRAGMENT, "Shaders/Cube.frag.spv" } };
 		desc.CullMode = CullMode::NONE;
 
 		m_Pipeline = Pipeline::Create(desc);
-
-		dsl.reset();
 	}
 
 	virtual void OnUpdate(float dt) override
 	{
-		UpdateCamera(dt);
+		m_Camera.OnUpdate(dt);
 
 		glm::mat4 model = glm::scale(glm::identity<glm::mat4>(), glm::vec3(5.0f, 5.0f, 5.0f));
 		model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
 		model = glm::rotate(model, 45.0f, { 0.0f, 1.0f, 0.5f });
 
-		UBO ubo = {};
-		ubo.MVP = m_Projection * m_View * model;
-		m_DS->Update(0, &ubo, sizeof(ubo));
+		Cube::UBO ubo = {};
+		ubo.MVP = m_Camera.GetViewProjection() * model;
+		m_UniformBuffer->SetData(&ubo);
 	}
 
 	virtual void Render(CommandBuffer& commandBuffer) override
@@ -135,75 +125,20 @@ protected:
 		m_Texture.reset();
 
 		m_VertexBuffer.reset();
+		m_UniformBuffer.reset();
 	}
 
 	virtual void OnEvent(Event& event) override
 	{
 	}
 private:
-	void UpdateCamera(float dt)
-	{
-		constexpr float sensitivity = 5.0f;
-		constexpr glm::vec3 upVector = { 0.0f, 1.0f, 0.0f };
-
-		static glm::vec2 oldMousePosition;
-
-		const auto& mousePosition = Input::MousePosition();
-		const glm::vec2 mouseDelta = mousePosition - oldMousePosition;
-		oldMousePosition = mousePosition;
-
-		glm::vec3 translation = {};
-
-		if (Input::IsKeyPressed(KeyCode::W))
-			translation.z -= sensitivity;
-		else if (Input::IsKeyPressed(KeyCode::S))
-			translation.z += sensitivity;
-
-		if (Input::IsKeyPressed(KeyCode::A))
-			translation.x -= sensitivity;
-		else if (Input::IsKeyPressed(KeyCode::D))
-			translation.x += sensitivity;
-
-		if (Input::IsMousePressed(MouseButton::RMB))
-		{
-			Input::HideCursor(true);
-
-			const float deltaX = mouseDelta.x * -1.0f;
-			const float deltaY = mouseDelta.y;
-
-			m_CameraRotation = glm::angleAxis(deltaX * 0.001f, upVector) * m_CameraRotation;
-			auto pitchedRotation = m_CameraRotation * glm::angleAxis(deltaY * 0.001f, glm::vec3{ -1.0f, 0.0f, 0.0f });
-			if (glm::dot(pitchedRotation * upVector, upVector) >= 0.0f)
-			{
-				m_CameraRotation = pitchedRotation;
-			}
-
-			m_CameraRotation = glm::normalize(m_CameraRotation);
-		}
-		else
-		{
-			Input::HideCursor(false);
-		}
-
-		m_CameraPosition += (m_CameraRotation * translation) * dt;
-
-		m_View = glm::translate(glm::transpose(glm::mat4(m_CameraRotation)), -m_CameraPosition);
-
-		const auto& [width, height] = Application::GetSize();
-
-		m_Projection = glm::perspective(glm::radians(70.0f), (float)width / (float)height, 0.1f, 1000.0f);
-		m_Projection[1][1] *= -1.0f;
-	}
-private:
-	glm::vec3 m_CameraPosition = { 0.0f, 0.0f, 10.0f };
-	glm::quat m_CameraRotation{ 1.0f, 0.0f, 0.0f, 0.0f };
-
-	glm::mat4 m_View;
-	glm::mat4 m_Projection;
+	Camera m_Camera;
 
 	Ref<Pipeline> m_Pipeline;
 	Ref<Buffer> m_VertexBuffer;
+	Ref<Buffer> m_UniformBuffer;
 	Ref<Texture2D> m_Texture;
+
 	Ref<DescriptorSet> m_DS;
 };
 

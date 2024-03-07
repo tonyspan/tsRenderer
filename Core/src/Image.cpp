@@ -18,7 +18,7 @@ static bool HasStencil(VkFormat format)
 
 ImageDescription::ImageDescription()
 	: Width(0), Height(0), MipLevels(0), ImageCount(0)
-	, NumSamples(VK_SAMPLE_COUNT_1_BIT), Format(VK_FORMAT_UNDEFINED)
+	, MSAAnumSamples(0), Format(Format::UNDEFINED)
 	, ImageUsage(VK_IMAGE_USAGE_FLAG_BITS_MAX_ENUM)
 	, ImageCreateFlags(VK_IMAGE_CREATE_FLAG_BITS_MAX_ENUM)
 	, ImageAspectFlags(VK_IMAGE_ASPECT_NONE)
@@ -84,9 +84,9 @@ VkImageView Image2D::GetImageViewHandle() const
 	return m_Image.ImageView;
 }
 
-void Image2D::TransitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLayout)
+void Image2D::TransitionImageLayout(VkImageLayout newLayout, VkImageLayout oldLayout)
 {
-	Ref<CommandBuffer> commandBuffer = CommandBuffer::Create({ &Context::GetDevice().GetCommandPool(), VK_COMMAND_BUFFER_LEVEL_PRIMARY });
+	Ref<CommandBuffer> commandBuffer = CommandBuffer::Create(true);
 	commandBuffer->BeginSingleTime();
 
 	VkImageMemoryBarrier barrier;
@@ -102,7 +102,8 @@ void Image2D::TransitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLa
 	{
 		barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 
-		if (HasStencil(m_Description.Format))
+		const VkFormat vkFormat = Convert(m_Description.Format);
+		if (HasStencil(vkFormat))
 			barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
 	}
 	else
@@ -152,7 +153,7 @@ void Image2D::TransitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLa
 
 void Image2D::CopyFrom(const Buffer& buffer)
 {
-	Ref<CommandBuffer> commandBuffer = CommandBuffer::Create({ &Context::GetDevice().GetCommandPool(), VK_COMMAND_BUFFER_LEVEL_PRIMARY });
+	Ref<CommandBuffer> commandBuffer = CommandBuffer::Create(true);
 	commandBuffer->BeginSingleTime();
 
 	VkBufferImageCopy region = {};
@@ -184,6 +185,16 @@ uint32_t Image2D::GetHeight() const
 	return m_Description.Height;
 }
 
+Format Image2D::GetFormat() const
+{
+	return m_Description.Format;
+}
+
+uint32_t Image2D::GetMSAAsamples() const
+{
+	return m_Description.MSAAnumSamples;
+}
+
 void Image2D::CreateImage()
 {
 	const auto& physicalDevice = Context::GetDevice().GetPhysicalDevice();
@@ -198,12 +209,12 @@ void Image2D::CreateImage()
 	imageInfo.extent.depth = 1;
 	imageInfo.mipLevels = m_Description.MipLevels;
 	imageInfo.arrayLayers = m_Description.ImageCount;
-	imageInfo.format = m_Description.Format;
+	imageInfo.format = Convert(m_Description.Format);
 	imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	imageInfo.usage = m_Description.ImageUsage;
 	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	imageInfo.samples = m_Description.NumSamples;
+	imageInfo.samples = Convert(m_Description.MSAAnumSamples);
 	imageInfo.flags = m_Description.ImageCreateFlags;
 
 	VkResult result = vkCreateImage(device, &imageInfo, nullptr, &m_Image.Image);
@@ -236,7 +247,7 @@ void Image2D::CreateImageView()
 
 	viewInfo.image = m_Image.Image;
 	viewInfo.viewType = m_Description.ViewType;
-	viewInfo.format = m_Description.Format;
+	viewInfo.format = Convert(m_Description.Format);
 	viewInfo.subresourceRange.aspectMask = m_Description.ImageAspectFlags;
 	viewInfo.subresourceRange.baseMipLevel = 0;
 	viewInfo.subresourceRange.levelCount = m_Description.MipLevels;
@@ -253,11 +264,11 @@ void Image2D::GenerateMipMaps()
 	const auto& physicalDevice = Context::GetDevice().GetPhysicalDevice().GetHandle();
 
 	VkFormatProperties formatProperties;
-	vkGetPhysicalDeviceFormatProperties(physicalDevice, m_Description.Format, &formatProperties);
+	vkGetPhysicalDeviceFormatProperties(physicalDevice, Convert(m_Description.Format), &formatProperties);
 
 	ASSERT(formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT, "Image format doesn't support linear blitting");
 
-	Ref<CommandBuffer> commandBuffer = CommandBuffer::Create({ &Context::GetDevice().GetCommandPool(), VK_COMMAND_BUFFER_LEVEL_PRIMARY });
+	Ref<CommandBuffer> commandBuffer = CommandBuffer::Create(true);
 	commandBuffer->BeginSingleTime();
 
 	VkImageMemoryBarrier barrier;

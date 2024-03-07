@@ -19,14 +19,6 @@ DescriptorPool::~DescriptorPool()
 	Destroy();
 }
 
-void DescriptorPool::Recreate()
-{
-	if (Handle::GetHandle())
-		Destroy();
-
-	CreateDescriptorPool();
-}
-
 void DescriptorPool::CreateDescriptorPool()
 {
 	// Taken from ImGui example

@@ -12,6 +12,8 @@
 #include <vector>
 #include <fstream>
 #include <filesystem>
+#include <iomanip>
+#include <sstream>
 
 static constexpr const char* s_spvExtention = ".spv";
 static constexpr const char* const s_ShaderExtensions[] = { ".vert", ".frag" };
@@ -115,9 +117,11 @@ void Shader::CompileShaders(const std::string& shaderDirectory)
 		if (std::filesystem::exists(outputPathWithExtension))
 			continue;
 
-		std::string cmd = vulkanSDK + "\\Bin\\glslangValidator.exe -o " + outputPathWithExtension + " -V " + outputPath;
+		// The escaped quotes are necessary since there may be spaces somewhere in the path
+		std::stringstream cmd;
+		cmd << vulkanSDK << "\\Bin\\glslangValidator.exe -o " << std::quoted(outputPathWithExtension) << " -V " << std::quoted(outputPath);
 
-		int executed = system(cmd.data());
+		int executed = system(cmd.str().data());
 
 		if (/*executed*/std::filesystem::exists(outputPathWithExtension))
 		{

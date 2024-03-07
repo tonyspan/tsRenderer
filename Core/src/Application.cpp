@@ -103,8 +103,6 @@ void Application::OnResize(Event& event)
 
 	OnShutdown();
 
-	Context::GetDescriptorPool().Recreate();
-
 	Context::GetSwapchain().OnResize(width, height);
 	m_Window->OnResize(width, height);
 

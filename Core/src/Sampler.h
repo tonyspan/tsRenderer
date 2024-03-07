@@ -4,13 +4,13 @@
 
 #include "VK.h"
 
+#include "Enums.h"
+
 struct SamplerDescription
 {
-	uint32_t MipLevels;
-	VkFilter MinFilter;
-	VkFilter MagFilter;
-
-	SamplerDescription();
+	uint32_t MipLevels = 0;
+	Filter MinFilter = Filter::UNDEFINED;
+	Filter MagFilter = Filter::UNDEFINED;
 };
 
 class Sampler : public Handle<VkSampler>

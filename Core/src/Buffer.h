@@ -30,8 +30,15 @@ public:
 	Buffer(const BufferDescription& desc);
 	~Buffer();
 
+	DELETE_COPY_AND_MOVE(Buffer);
+
 	void Init(const BufferDescription& desc);
+
 	void SetData(const void* data, VkDeviceSize size, VkDeviceSize offset = 0);
+	// Will use the size defined with BufferDescription::Size
+	void SetData(const void* data);
+
+	const BufferDescription& GetDescription() const;
 
 	VkDeviceMemory GetMemory() const;
 	VkDeviceMemory GetMemory();

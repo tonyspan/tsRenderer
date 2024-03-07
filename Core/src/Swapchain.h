@@ -56,9 +56,9 @@ public:
 
 	const SwapchainDescription& GetDescription() const;
 
-	const VkFormat GetImageFormat() const;
 	const uint32_t GetImageCount() const;
 	const uint32_t GetCurrentImage() const;
+	const Image2D* GetImage(uint32_t index) const;
 	const uint32_t GetCurrentFrame() const;
 	Ref<RenderPass> GetRenderPass() const;
 
@@ -77,8 +77,11 @@ private:
 	void CreateAll();
 	void Destroy();
 
-	void Submit(const std::span<VkSemaphore> waitSemaphore, const std::span<VkSemaphore> signalSemaphore, const std::span<VkCommandBuffer> commandBuffer);
-	void Present(const std::span<VkSemaphore> signalSemaphore);
+	void Submit(const std::span<const VkSemaphore> waitSemaphore, const std::span<const VkSemaphore> signalSemaphore, const std::span<const VkCommandBuffer> commandBuffer);
+	void Present(const std::span<const VkSemaphore> signalSemaphore);
+
+	const FrameData& GetFrameData(uint32_t index) const;
+	FrameData& GetFrameData(uint32_t index);
 
 	Framebuffer& GetCurrentFramebuffer();
 

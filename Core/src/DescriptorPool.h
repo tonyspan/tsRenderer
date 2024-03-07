@@ -9,8 +9,6 @@ class DescriptorPool : public Handle<VkDescriptorPool>
 public:
 	DescriptorPool(const Device& device);
 	~DescriptorPool();
-
-	void Recreate();
 private:
 	void CreateDescriptorPool();
 	void Destroy();

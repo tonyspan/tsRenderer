@@ -96,11 +96,6 @@ const SwapchainDescription& Swapchain::GetDescription() const
 	return m_Description;
 }
 
-const VkFormat Swapchain::GetImageFormat() const
-{
-	return m_ImageFormat;
-}
-
 const uint32_t Swapchain::GetImageCount() const
 {
 	// TODO: Remove
@@ -112,6 +107,11 @@ const uint32_t Swapchain::GetImageCount() const
 const uint32_t Swapchain::GetCurrentImage() const
 {
 	return m_ImageIndex;
+}
+
+const Image2D* Swapchain::GetImage(uint32_t index) const
+{
+	return GetFrameData(index).Image.get();
 }
 
 const uint32_t Swapchain::GetCurrentFrame() const
@@ -126,17 +126,17 @@ Ref<RenderPass> Swapchain::GetRenderPass() const
 
 CommandBuffer& Swapchain::GetCurrentCommandBuffer() const
 {
-	return *m_FrameData.at(m_ImageIndex).CommandBuffer;
+	return *GetFrameData(m_ImageIndex).CommandBuffer;
 }
 
 CommandBuffer& Swapchain::GetCurrentCommandBuffer()
 {
-	return *m_FrameData.at(m_ImageIndex).CommandBuffer;
+	return *GetFrameData(m_ImageIndex).CommandBuffer;
 }
 
 void Swapchain::CreateSwapchain()
 {
-	ASSERT(m_Description.FramesInFlight > 0, "FramesInFlight <= 0");
+	ASSERT(m_Description.FramesInFlight > 0, STR(m_Description.FramesInFlight) " <= 0");
 	ASSERT(m_Description.Width != 0 && m_Description.Height != 0, STR(m_Description.Width, m_Description.Height) " == 0");
 
 	const PhysicalDevice& physicalDevice = m_Device.GetPhysicalDevice();
@@ -202,9 +202,13 @@ void Swapchain::CreateImagesAndViews()
 	VkResult result = vkGetSwapchainImagesKHR(m_Device.GetHandle(), Handle::GetHandle(), &imageCount, swapchainImages);
 	VK_CHECK_RESULT(result);
 
+	Format format = Format::BGRA_8_SRGB;
+	ASSERT(Convert(format) == m_ImageFormat);
+
 	ImageDescription desc;
 
-	desc.Format = m_ImageFormat;
+	desc.Format = format;
+	desc.MSAAnumSamples = 1;
 	desc.ImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
 	desc.ViewType = VK_IMAGE_VIEW_TYPE_2D;
 	desc.MipLevels = 1;
@@ -224,14 +228,17 @@ void Swapchain::CreateImagesAndViews()
 
 void Swapchain::CreateColorResources()
 {
+	Format format = Format::BGRA_8_SRGB;
+	ASSERT(Convert(format) == m_ImageFormat);
+
 	ImageDescription desc;
 
 	desc.Width = m_Description.Width;
 	desc.Height = m_Description.Height;
 	desc.MipLevels = 1;
 	desc.ImageCount = 1;
-	desc.NumSamples = m_Device.GetPhysicalDevice().GetMsaaSamples();
-	desc.Format = m_ImageFormat;
+	desc.MSAAnumSamples = 8; // MUST be 8 since Pipeline uses the samples from m_Device.GetPhysicalDevice().GetMsaaSamples()
+	desc.Format = format;
 	desc.ImageUsage = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 	desc.ImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
 	desc.ImageCreateFlags = 0;
@@ -243,7 +250,8 @@ void Swapchain::CreateColorResources()
 
 void Swapchain::CreateDepthResources()
 {
-	const auto& physicalDevice = m_Device.GetPhysicalDevice();
+	Format format = Format::D32_SFLOAT;
+	ASSERT(m_Device.GetPhysicalDevice().GetDepthFormat() == Convert(format));
 
 	ImageDescription desc;
 
@@ -251,8 +259,8 @@ void Swapchain::CreateDepthResources()
 	desc.Height = m_Description.Height;
 	desc.MipLevels = 1;
 	desc.ImageCount = 1;
-	desc.NumSamples = physicalDevice.GetMsaaSamples();
-	desc.Format = physicalDevice.GetDepthFormat();
+	desc.MSAAnumSamples = 8; // MUST be 8 since Pipeline uses the samples from m_Device.GetPhysicalDevice().GetMsaaSamples()
+	desc.Format = format;
 	desc.ImageUsage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 	desc.ImageAspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT;
 	desc.ImageCreateFlags = 0;
@@ -264,7 +272,13 @@ void Swapchain::CreateDepthResources()
 
 void Swapchain::CreateRenderPass()
 {
-	m_RenderPass = RenderPass::Create(m_Device, *this);
+	RenderPassDescription desc;
+
+	std::array<const Image2D* const, 3> attachments = { m_ColorImage.get(), m_DepthImage.get(), GetImage(0) };
+
+	desc.Attachments = attachments;
+
+	m_RenderPass = RenderPass::Create(desc);
 }
 
 void Swapchain::CreateFramebuffers()
@@ -274,30 +288,24 @@ void Swapchain::CreateFramebuffers()
 	desc.Width = m_Description.Width;
 	desc.Height = m_Description.Height;
 	desc.ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
-	desc.Format = m_ImageFormat;
 	desc.RenderPass = m_RenderPass.get();
 
-	for (auto& frameData : m_FrameData)
+	for (uint32_t i = 0; i < m_FrameData.size(); i++)
 	{
-		std::array<Image2D*, 3> attachments = { m_ColorImage.get(), m_DepthImage.get(), frameData.Image.get() };
+		std::array<const Image2D*, 3> attachments = { m_ColorImage.get(), m_DepthImage.get(), GetImage(i) };
 
 		desc.Attachments = attachments;
 
-		frameData.Framebuffer = Framebuffer::Create(m_Device, desc);
+		m_FrameData[i].Framebuffer = Framebuffer::Create(desc);
 	}
 }
 
 void Swapchain::CreateCommandBuffers()
 {
-	CommandBufferDescription desc;
-
-	desc.Pool = &m_Device.GetCommandPool();
-	desc.Level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-
 	for (auto& frameData : m_FrameData)
 	{
 		auto& cmdBuffer = frameData.CommandBuffer;
-		cmdBuffer = CommandBuffer::Create(desc);
+		cmdBuffer = CommandBuffer::Create(true);
 	}
 }
 
@@ -320,9 +328,9 @@ void Swapchain::CreateAll()
 {
 	CreateSwapchain();
 	CreateImagesAndViews();
-	CreateRenderPass();
 	CreateColorResources();
 	CreateDepthResources();
+	CreateRenderPass();
 	CreateFramebuffers();
 	CreateCommandBuffers();
 	CreateSyncObjects();
@@ -358,7 +366,8 @@ void Swapchain::Destroy()
 	vkDestroySwapchainKHR(device, Handle::GetHandle(), nullptr);
 }
 
-void Swapchain::Submit(const std::span<VkSemaphore> waitSemaphore, const std::span<VkSemaphore> signalSemaphore, const std::span<VkCommandBuffer> commandBuffer)
+void Swapchain::Submit(const std::span<const VkSemaphore> waitSemaphore, const std::span<const VkSemaphore> signalSemaphore,
+	const std::span<const VkCommandBuffer> commandBuffer)
 {
 	PROFILE_FUNCTION();
 
@@ -381,7 +390,7 @@ void Swapchain::Submit(const std::span<VkSemaphore> waitSemaphore, const std::sp
 	VK_CHECK_RESULT(result);
 }
 
-void Swapchain::Present(const std::span<VkSemaphore> signalSemaphore)
+void Swapchain::Present(const std::span<const VkSemaphore> signalSemaphore)
 {
 	PROFILE_FUNCTION();
 
@@ -409,17 +418,31 @@ void Swapchain::Present(const std::span<VkSemaphore> signalSemaphore)
 	}
 }
 
+const Swapchain::FrameData& Swapchain::GetFrameData(uint32_t index) const
+{
+	ASSERT(index >= 0 && index <= GetImageCount());
+
+	return m_FrameData.at(index);
+}
+
+Swapchain::FrameData& Swapchain::GetFrameData(uint32_t index)
+{
+	ASSERT(index >= 0 && index <= GetImageCount());
+
+	return m_FrameData.at(index);
+}
+
 Framebuffer& Swapchain::GetCurrentFramebuffer()
 {
-	return *m_FrameData.at(m_ImageIndex).Framebuffer;
+	return *GetFrameData(m_ImageIndex).Framebuffer;
 }
 
 Fence& Swapchain::GetCurrentFence()
 {
-	return *m_FrameData.at(m_CurrentFrame).Fence;
+	return *GetFrameData(m_CurrentFrame).Fence;
 }
 
 Swapchain::Semaphores& Swapchain::GetCurrentSemaphores()
 {
-	return m_FrameData.at(m_CurrentFrame).Semaphoress;
+	return GetFrameData(m_CurrentFrame).Semaphoress;
 }

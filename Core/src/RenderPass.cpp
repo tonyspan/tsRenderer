@@ -1,9 +1,11 @@
 #include "RenderPass.h"
 
+#include "Context.h"
 #include "Device.h"
 #include "Swapchain.h"
 #include "CommandBuffer.h"
 #include "Framebuffer.h"
+#include "Image.h"
 
 #include "Log.h"
 
@@ -11,20 +13,19 @@
 
 #include <array>
 
-Ref<RenderPass> RenderPass::Create(const Device& device, const Swapchain& swapchain)
+Ref<RenderPass> RenderPass::Create(const RenderPassDescription& desc)
 {
-	return CreateRef<RenderPass>(device, swapchain);
+	return CreateRef<RenderPass>(desc);
 }
 
-RenderPass::RenderPass(const Device& device, const Swapchain& swapchain)
-	: m_Device(device)
+RenderPass::RenderPass(const RenderPassDescription& desc)
 {
-	CreateRenderPass(swapchain);
+	CreateRenderPass(desc);
 }
 
 RenderPass::~RenderPass()
 {
-	vkDestroyRenderPass(m_Device.GetHandle(), Handle::GetHandle(), nullptr);
+	vkDestroyRenderPass(Context::GetDevice().GetHandle(), Handle::GetHandle(), nullptr);
 }
 
 void RenderPass::Begin(const CommandBuffer& commandBuffer, const Framebuffer& framebuffer)
@@ -55,91 +56,88 @@ void RenderPass::End(const CommandBuffer& commandBuffer)
 	vkCmdEndRenderPass(commandBuffer.GetHandle());
 }
 
-void RenderPass::CreateRenderPass(const Swapchain& swapchain)
+void RenderPass::CreateRenderPass(const RenderPassDescription& desc)
 {
-	const auto& physicalDevice = m_Device.GetPhysicalDevice();
-	const auto& msaaSamples = physicalDevice.GetMsaaSamples();
-	const auto& depthFormat = physicalDevice.GetDepthFormat();
-	const auto& imageFormat = swapchain.GetImageFormat();
+	const auto& physicalDevice = Context::GetDevice().GetPhysicalDevice();
+	const auto& descAttachments = desc.Attachments;
 
-	VkAttachmentDescription colorAttachmentResolve = {};
+	std::array<VkAttachmentDescription, 3> attachments{};
+	std::array<VkAttachmentReference, attachments.size()> attachmentRefs{};
 
-	colorAttachmentResolve.format = imageFormat;
-	colorAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
-	colorAttachmentResolve.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	colorAttachmentResolve.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-	colorAttachmentResolve.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	colorAttachmentResolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+	ASSERT(descAttachments.size() == attachments.size());
 
-	VkAttachmentReference colorAttachmentResolveRef = {};
+	VkFormat vkFormat = VK_FORMAT_UNDEFINED;
 
-	colorAttachmentResolveRef.attachment = 2;
-	colorAttachmentResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	// Color
+	const auto colorImage = descAttachments[0];
+	vkFormat = Convert(colorImage->GetFormat());
+	attachments[0].format = vkFormat;
+	attachments[0].samples = Convert(colorImage->GetMSAAsamples());
+	attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	attachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-	VkAttachmentDescription depthAttachment = {};
+	attachmentRefs[0] = { .attachment = 0, .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
 
-	depthAttachment.format = depthFormat;
-	depthAttachment.samples = msaaSamples;
-	depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	// Depth
+	const auto depthImage = descAttachments[1];
+	vkFormat = Convert(depthImage->GetFormat());
+	attachments[1].format = vkFormat;
+	attachments[1].samples = Convert(depthImage->GetMSAAsamples());
+	attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-	VkAttachmentReference depthAttachmentRef = {};
+	attachmentRefs[1] = { .attachment = 1, .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
 
-	depthAttachmentRef.attachment = 1;
-	depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	// Swapchain
+	const auto swapchainImage = descAttachments[2];
+	vkFormat = Convert(swapchainImage->GetFormat());
+	attachments[2].format = vkFormat;
+	attachments[2].samples = Convert(swapchainImage->GetMSAAsamples());
+	attachments[2].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	attachments[2].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	attachments[2].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	attachments[2].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	attachments[2].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	attachments[2].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
-	VkAttachmentDescription colorAttachment = {};
+	attachmentRefs[2] = { .attachment = 2, .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
 
-	colorAttachment.format = imageFormat;
-	colorAttachment.samples = msaaSamples;
-	colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-	colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	std::array<VkSubpassDescription, 1> subpasses{};
 
-	VkAttachmentReference colorAttachmentRef = {};
+	subpasses[0].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpasses[0].colorAttachmentCount = 1;
+	subpasses[0].pColorAttachments = &attachmentRefs[0];
+	subpasses[0].pDepthStencilAttachment = &attachmentRefs[1];
+	subpasses[0].pResolveAttachments = &attachmentRefs[2];
 
-	colorAttachmentRef.attachment = 0;
-	colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	std::array<VkSubpassDependency, 1> dependencies{};
 
-	VkSubpassDescription subpass = {};
-
-	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-	subpass.colorAttachmentCount = 1;
-	subpass.pColorAttachments = &colorAttachmentRef;
-	subpass.pDepthStencilAttachment = &depthAttachmentRef;
-	subpass.pResolveAttachments = &colorAttachmentResolveRef;
-
-	VkSubpassDependency dependency = {};
-
-	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-	dependency.dstSubpass = 0;
-	dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	dependency.srcAccessMask = 0;
-	dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-	std::array attachments = { colorAttachment, depthAttachment, colorAttachmentResolve };
+	dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+	dependencies[0].dstSubpass = 0;
+	dependencies[0].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependencies[0].srcAccessMask = 0;
+	dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
 	VkRenderPassCreateInfo renderPassInfo;
 	ZeroInitVkStruct(renderPassInfo, VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO);
 
-	renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());;
+	renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
 	renderPassInfo.pAttachments = attachments.data();
-	renderPassInfo.subpassCount = 1;
-	renderPassInfo.pSubpasses = &subpass;
-	renderPassInfo.dependencyCount = 1;
-	renderPassInfo.pDependencies = &dependency;
+	renderPassInfo.subpassCount = static_cast<uint32_t>(subpasses.size());
+	renderPassInfo.pSubpasses = subpasses.data();
+	renderPassInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
+	renderPassInfo.pDependencies = dependencies.data();
 
-	VkResult result = vkCreateRenderPass(m_Device.GetHandle(), &renderPassInfo, nullptr, &Handle::GetHandle());
+	VkResult result = vkCreateRenderPass(Context::GetDevice().GetHandle(), &renderPassInfo, nullptr, &Handle::GetHandle());
 	VK_CHECK_RESULT(result);
 	ASSERT(Handle::GetHandle(), "RenderPass creation failed");
 }

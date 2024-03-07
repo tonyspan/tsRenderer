@@ -2,7 +2,7 @@
 
 #include "Base.h"
 
-#include <vector>
+#include <array>
 #include <string_view>
 
 class Mesh;
@@ -11,11 +11,11 @@ class TextureCube;
 class Skybox
 {
 public:
-	static Ref<Skybox> Create(const std::string_view meshPath, const std::vector<std::string_view>& paths);
+	static Ref<Skybox> Create(const std::string_view meshPath, const std::array<std::string_view, 6>& paths);
 
 	Skybox() = delete;
 
-	Skybox(const std::string_view meshPath, const std::vector<std::string_view>& paths);
+	Skybox(const std::string_view meshPath, const std::array<std::string_view, 6>& paths);
 	~Skybox();
 
 	const Mesh& GetMesh() const;

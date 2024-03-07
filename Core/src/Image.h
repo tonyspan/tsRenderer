@@ -4,6 +4,8 @@
 
 #include "VK.h"
 
+#include "Enums.h"
+
 #pragma region Image
 
 struct ImageDescription
@@ -12,8 +14,8 @@ struct ImageDescription
 	uint32_t Height;
 	uint32_t MipLevels;
 	uint32_t ImageCount;
-	VkSampleCountFlagBits NumSamples;
-	VkFormat Format;
+	uint32_t MSAAnumSamples;
+	Format Format;
 	VkImageUsageFlags ImageUsage;
 	VkImageCreateFlags ImageCreateFlags;
 	VkImageAspectFlags ImageAspectFlags;
@@ -53,11 +55,13 @@ public:
 	VkImage GetImageHandle() const;
 	VkImageView GetImageViewHandle() const;
 
-	void TransitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLayout);
+	void TransitionImageLayout(VkImageLayout newLayout, VkImageLayout oldLayout = (VkImageLayout)0);
 	void CopyFrom(const Buffer& buffer);
 
 	uint32_t GetWidth() const;
 	uint32_t GetHeight() const;
+	Format GetFormat() const;
+	uint32_t GetMSAAsamples() const;
 private:
 	void CreateImage();
 	void CreateImageView();
