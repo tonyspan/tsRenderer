@@ -75,26 +75,36 @@ void CommandBuffer::EndSingleTime()
 	vkQueueWaitIdle(graphicsQueue);
 }
 
-void CommandBuffer::BindDescriptorSet(VkPipelineLayout layout, VkDescriptorSet set)
+void CommandBuffer::BindDescriptorSet(const DescriptorSet& set)
 {
-	vkCmdBindDescriptorSets(Handle::GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, 1, &set, 0, nullptr);
+	ASSERT(m_BoundPipeline);
+
+	auto vkSet = set.GetDescriptorSet();
+	ASSERT(vkSet);
+
+	vkCmdBindDescriptorSets(Handle::GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, m_BoundPipeline->GetHandle<VkPipelineLayout>(), 0, 1, &vkSet, 0, nullptr);
 }
 
 void CommandBuffer::BindVertexBuffer(const Buffer& buffer)
 {
-	std::array vertexBuffers = { buffer.GetHandle() };
+	std::array vertexBuffers = { buffer.GetHandle<VkBuffer>() };
 	VkDeviceSize offsets = 0;
 	vkCmdBindVertexBuffers(Handle::GetHandle(), 0, static_cast<uint32_t>(vertexBuffers.size()), vertexBuffers.data(), &offsets);
 }
 
 void CommandBuffer::BindIndexBuffer(const Buffer& buffer)
 {
-	vkCmdBindIndexBuffer(Handle::GetHandle(), buffer.GetHandle(), 0, VK_INDEX_TYPE_UINT32);
+	vkCmdBindIndexBuffer(Handle::GetHandle(), buffer.GetHandle<VkBuffer>(), 0, VK_INDEX_TYPE_UINT32);
 }
 
 void CommandBuffer::BindPipeline(const Pipeline& pipeline)
 {
-	vkCmdBindPipeline(Handle::GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.GetHandle());
+	auto& vkPipeline = pipeline.GetHandle<VkPipeline>();
+	ASSERT(vkPipeline);
+
+	m_BoundPipeline = &pipeline;
+
+	vkCmdBindPipeline(Handle::GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipeline);
 }
 
 void CommandBuffer::Draw(uint32_t vertexCount)
@@ -109,14 +119,16 @@ void CommandBuffer::DrawIndexed(uint32_t indexCount, uint32_t firstIndex)
 
 void CommandBuffer::CreateCommandBuffer(bool isPrimary)
 {
+	const auto& device = Context::GetDevice();
+
 	VkCommandBufferAllocateInfo bufferAllocInfo;
 	ZeroInitVkStruct(bufferAllocInfo, VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO);
 
 	bufferAllocInfo.commandBufferCount = 1;
-	bufferAllocInfo.commandPool = Context::GetDevice().GetCommandPool().GetHandle();
+	bufferAllocInfo.commandPool = device.GetCommandPool().GetHandle();
 	bufferAllocInfo.level = isPrimary ? VK_COMMAND_BUFFER_LEVEL_PRIMARY : VK_COMMAND_BUFFER_LEVEL_SECONDARY;
 
-	VkResult result = vkAllocateCommandBuffers(Context::GetDevice().GetHandle(), &bufferAllocInfo, &Handle::GetHandle());
+	VkResult result = vkAllocateCommandBuffers(device.GetHandle(), &bufferAllocInfo, &Handle::GetHandle());
 	VK_CHECK_RESULT(result);
 	ASSERT(Handle::GetHandle(), "Command buffer allocation failed");
 }

@@ -8,23 +8,6 @@
 
 #include <vulkan/vulkan.h>
 
-BufferDescription::BufferDescription()
-	: Size(0)
-	, Usage(VK_BUFFER_USAGE_FLAG_BITS_MAX_ENUM)
-	, Properties(VK_MEMORY_PROPERTY_FLAG_BITS_MAX_ENUM)
-{
-}
-
-BufferDescription::BufferDescription(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags props)
-	: Size(size), Usage(usage), Properties(props)
-{
-}
-
-Ref<Buffer> Buffer::Create()
-{
-	return CreateRef<Buffer>();
-}
-
 Ref<Buffer> Buffer::Create(const BufferDescription& desc)
 {
 	return CreateRef<Buffer>(desc);
@@ -46,12 +29,13 @@ Ref<Buffer> Buffer::CreateVertex(VkDeviceSize size, const void* data)
 	return buffer;
 }
 
-Ref<Buffer> Buffer::CreateIndex(VkDeviceSize size, const void* data)
+Ref<Buffer> Buffer::CreateIndex(VkDeviceSize size, uint32_t count, const void* data)
 {
 	BufferDescription desc;
 	desc.Size = size;
 	desc.Usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
 	desc.Properties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+	desc.IndexCount = count;
 
 	Ref<Buffer> buffer = Buffer::Create(desc);
 
@@ -93,8 +77,8 @@ Buffer::~Buffer()
 {
 	const auto& device = Context::GetDevice().GetHandle();
 
-	vkDestroyBuffer(device, Handle::GetHandle(), nullptr);
-	vkFreeMemory(device, m_Memory, nullptr);
+	vkDestroyBuffer(device, Handle::GetHandle<VkBuffer>(), nullptr);
+	vkFreeMemory(device, Handle::GetHandle<VkDeviceMemory>(), nullptr);
 }
 
 void Buffer::Init(const BufferDescription& desc)
@@ -110,12 +94,13 @@ void Buffer::SetData(const void* data, VkDeviceSize size, VkDeviceSize offset)
 	ASSERT(size > 0 && size <= m_Description.Size);
 
 	const auto& device = Context::GetDevice().GetHandle();
+	auto& memoryHandle = Handle::GetHandle<VkDeviceMemory>();
 
 	void* mappedData = nullptr;
 
-	vkMapMemory(device, m_Memory, 0, size, 0, (void**)&mappedData);
+	vkMapMemory(device, memoryHandle, 0, size, 0, (void**)&mappedData);
 	memcpy(static_cast<char*>(mappedData) + offset, data, static_cast<size_t>(size));
-	vkUnmapMemory(device, m_Memory);
+	vkUnmapMemory(device, memoryHandle);
 }
 
 void Buffer::SetData(const void* data)
@@ -126,16 +111,6 @@ void Buffer::SetData(const void* data)
 const BufferDescription& Buffer::GetDescription() const
 {
 	return m_Description;
-}
-
-VkDeviceMemory Buffer::GetMemory() const
-{
-	return m_Memory;
-}
-
-VkDeviceMemory Buffer::GetMemory()
-{
-	return m_Memory;
 }
 
 void Buffer::CreateBuffer()
@@ -155,12 +130,14 @@ void Buffer::CreateBuffer()
 	bufferInfo.usage = m_Description.Usage;
 	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-	VkResult result = vkCreateBuffer(vkDevice, &bufferInfo, nullptr, &Handle::GetHandle());
+	auto& bufferHandle = Handle::GetHandle<VkBuffer>();
+
+	VkResult result = vkCreateBuffer(vkDevice, &bufferInfo, nullptr, &bufferHandle);
 	VK_CHECK_RESULT(result);
-	ASSERT(Handle::GetHandle(), "Buffer Creation failed");
+	ASSERT(bufferHandle, "Buffer Creation failed");
 
 	VkMemoryRequirements memRequirements;
-	vkGetBufferMemoryRequirements(vkDevice, Handle::GetHandle(), &memRequirements);
+	vkGetBufferMemoryRequirements(vkDevice, bufferHandle, &memRequirements);
 
 	VkMemoryAllocateInfo allocInfo;
 	ZeroInitVkStruct(allocInfo, VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO);
@@ -168,10 +145,12 @@ void Buffer::CreateBuffer()
 	allocInfo.allocationSize = memRequirements.size;
 	allocInfo.memoryTypeIndex = device.GetPhysicalDevice().GetMemoryType(memRequirements.memoryTypeBits, m_Description.Properties);
 
-	result = vkAllocateMemory(vkDevice, &allocInfo, nullptr, &m_Memory);
-	VK_CHECK_RESULT(result);
-	ASSERT(m_Memory, "Failed to allocate buffer memory");
+	auto& memoryHandle = Handle::GetHandle<VkDeviceMemory>();
 
-	result = vkBindBufferMemory(vkDevice, Handle::GetHandle(), m_Memory, 0);
+	result = vkAllocateMemory(vkDevice, &allocInfo, nullptr, &memoryHandle);
+	VK_CHECK_RESULT(result);
+	ASSERT(memoryHandle, "Failed to allocate buffer memory");
+
+	result = vkBindBufferMemory(vkDevice, bufferHandle, memoryHandle, 0);
 	VK_CHECK_RESULT(result);
 }

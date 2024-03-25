@@ -2,7 +2,14 @@
 
 #include <cstdint>
 
+#include <tuple>
+#include <concepts>
+
 template<typename VkStruct, typename VkStructType>
+	requires requires(VkStruct vkStruct)
+{
+	{ vkStruct.sType };
+}
 void ZeroInitVkStruct(VkStruct& vkStruct, const VkStructType& type)
 {
 	vkStruct = {};
@@ -10,30 +17,83 @@ void ZeroInitVkStruct(VkStruct& vkStruct, const VkStructType& type)
 	vkStruct.sType = type;
 }
 
-template<typename T>
+template <typename... Types>
+//requires (std::is_pointer_v<Types> && ...)
 class Handle
 {
 public:
-	Handle() = default;
+	static_assert((std::is_pointer_v<Types> && ...), "Types must be pointers");
+
+	Handle()
+		: m_Handles(Init<Types...>())
+	{
+	}
 
 	virtual ~Handle()
 	{
-		m_Handle = nullptr;
+		std::apply([]<typename... T>(T&...handles)
+		{
+			((handles = nullptr), ...);
+		}, m_Handles);
 	}
 
-	operator T() { return m_Handle; }
-	operator T& () { return m_Handle; }
-	operator T& () const { return m_Handle; }
+	template <typename T>
+	T& GetHandle()
+	{
+		static_assert(HasType<T>());
 
-	T& GetHandle() { return m_Handle; }
-	const T& GetHandle() const { return m_Handle; }
+		return std::get<T>(m_Handles);
+	}
+
+	template <typename T>
+	const T& GetHandle() const
+	{
+		static_assert(HasType<T>());
+
+		return std::get<T>(m_Handles);
+	}
+
+	template <typename T = std::tuple<Types...>, typename = std::enable_if_t<(std::tuple_size<T>::value == 1)>>
+	decltype(auto) GetHandle()
+	{
+		return std::get<0>(m_Handles);
+	}
+
+	template <typename T = std::tuple<Types...>>
+		requires (std::tuple_size<T>::value == 1)
+	decltype(auto) GetHandle() const
+	{
+		return std::get<0>(m_Handles);
+	}
 private:
-	T m_Handle = nullptr;
+	template<typename T, typename... Rest>
+	static constexpr auto Init()
+	{
+		if constexpr (sizeof...(Rest) == 0)
+		{
+			return std::make_tuple(static_cast<T>(nullptr));
+		}
+		else
+		{
+			return std::tuple_cat(std::make_tuple(static_cast<T>(nullptr)), Init<Rest...>());
+		}
+	}
+
+	template<typename T>
+	static constexpr bool HasType()
+	{
+		return std::disjunction_v<std::is_same<T, Types>...>;
+	}
+private:
+	std::tuple<Types...> m_Handles;
 };
 
 #define VK_FWD_DECL_HANDLE(X) typedef struct X##_T* X;
 #define VK_FWD_DECL_STRUCT(X) typedef struct X X;
 #define VK_FWD_DECL_ENUM(X) typedef enum X : int X;
+
+// Max value of all(?) Vulkan enums
+#define VK_MAX_VALUE_ENUM (~0U >> 1) /* = 0x7FFFFFFF or 2147483647 */
 
 typedef uint64_t VkDeviceSize;
 typedef uint32_t VkFlags;

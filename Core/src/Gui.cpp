@@ -7,6 +7,7 @@
 #include "CommandBuffer.h"
 #include "Texture.h"
 #include "RenderPass.h"
+#include "Framebuffer.h"
 
 #include "Window.h"
 
@@ -96,7 +97,11 @@ void Gui::Init(const Window& window)
 	initInfo.Subpass = 0;
 	initInfo.MinImageCount = 2;
 	initInfo.ImageCount = swapchain.GetImageCount();
-	initInfo.MSAASamples = physicalDevice.GetMsaaSamples();
+
+	// TODO: Find a better way to deal with it
+	const auto& msaaSamples = swapchain.GetCurrentFramebuffer().GetDescription().MSAAnumSamples;
+
+	initInfo.MSAASamples = msaaSamples > 1 ? Convert(msaaSamples.value()) : VK_SAMPLE_COUNT_1_BIT;
 	initInfo.Allocator = nullptr;
 	initInfo.CheckVkResultFn = [](VkResult result) { VK_CHECK_RESULT(result); };
 

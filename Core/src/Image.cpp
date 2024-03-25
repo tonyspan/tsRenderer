@@ -16,22 +16,6 @@ static bool HasStencil(VkFormat format)
 
 #pragma region Image
 
-ImageDescription::ImageDescription()
-	: Width(0), Height(0), MipLevels(0), ImageCount(0)
-	, MSAAnumSamples(0), Format(Format::UNDEFINED)
-	, ImageUsage(VK_IMAGE_USAGE_FLAG_BITS_MAX_ENUM)
-	, ImageCreateFlags(VK_IMAGE_CREATE_FLAG_BITS_MAX_ENUM)
-	, ImageAspectFlags(VK_IMAGE_ASPECT_NONE)
-	, ViewType(VK_IMAGE_VIEW_TYPE_MAX_ENUM)
-	, Properties(VK_MEMORY_PROPERTY_FLAG_BITS_MAX_ENUM)
-{
-}
-
-ImageHandle::ImageHandle()
-	: Image(VK_NULL_HANDLE), ImageView(VK_NULL_HANDLE), Memory(VK_NULL_HANDLE)
-{
-}
-
 Ref<Image2D> Image2D::Create(const ImageDescription& desc)
 {
 	ASSERT(!desc.IsSwapchainImage);
@@ -57,7 +41,7 @@ Image2D::Image2D(const ImageDescription& desc)
 Image2D::Image2D(const ImageDescription& desc, VkImage image)
 	: m_Description(desc)
 {
-	m_Image.Image = image;
+	Handle::GetHandle<VkImage>() = image;
 	CreateImageView();
 }
 
@@ -65,23 +49,13 @@ Image2D::~Image2D()
 {
 	const auto& vkDevice = Context::GetDevice().GetHandle();
 
-	vkDestroyImageView(vkDevice, m_Image.ImageView, nullptr);
+	vkDestroyImageView(vkDevice, Handle::GetHandle<VkImageView>(), nullptr);
 
 	if (!m_Description.IsSwapchainImage)
 	{
-		vkDestroyImage(vkDevice, m_Image.Image, nullptr);
-		vkFreeMemory(vkDevice, m_Image.Memory, nullptr);
+		vkDestroyImage(vkDevice, Handle::GetHandle<VkImage>(), nullptr);
+		vkFreeMemory(vkDevice, Handle::GetHandle<VkDeviceMemory>(), nullptr);
 	}
-}
-
-VkImage Image2D::GetImageHandle() const
-{
-	return m_Image.Image;
-}
-
-VkImageView Image2D::GetImageViewHandle() const
-{
-	return m_Image.ImageView;
 }
 
 void Image2D::TransitionImageLayout(VkImageLayout newLayout, VkImageLayout oldLayout)
@@ -96,7 +70,7 @@ void Image2D::TransitionImageLayout(VkImageLayout newLayout, VkImageLayout oldLa
 	barrier.newLayout = newLayout;
 	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barrier.image = m_Image.Image;
+	barrier.image = Handle::GetHandle<VkImage>();
 
 	if (newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
 	{
@@ -168,7 +142,7 @@ void Image2D::CopyFrom(const Buffer& buffer)
 	region.imageOffset = { 0, 0, 0 };
 	region.imageExtent = { m_Description.Width, m_Description.Height, 1 };
 
-	vkCmdCopyBufferToImage(commandBuffer->GetHandle(), buffer.GetHandle(), m_Image.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+	vkCmdCopyBufferToImage(commandBuffer->GetHandle(), buffer.GetHandle<VkBuffer>(), Handle::GetHandle<VkImage>(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
 	commandBuffer->EndSingleTime();
 
@@ -188,11 +162,6 @@ uint32_t Image2D::GetHeight() const
 Format Image2D::GetFormat() const
 {
 	return m_Description.Format;
-}
-
-uint32_t Image2D::GetMSAAsamples() const
-{
-	return m_Description.MSAAnumSamples;
 }
 
 void Image2D::CreateImage()
@@ -217,12 +186,14 @@ void Image2D::CreateImage()
 	imageInfo.samples = Convert(m_Description.MSAAnumSamples);
 	imageInfo.flags = m_Description.ImageCreateFlags;
 
-	VkResult result = vkCreateImage(device, &imageInfo, nullptr, &m_Image.Image);
+	auto& imageHandle = Handle::GetHandle<VkImage>();
+
+	VkResult result = vkCreateImage(device, &imageInfo, nullptr, &imageHandle);
 	VK_CHECK_RESULT(result);
-	ASSERT(m_Image.Image, "Image creation failed");
+	ASSERT(imageHandle, "Image creation failed");
 
 	VkMemoryRequirements memRequirements;
-	vkGetImageMemoryRequirements(device, m_Image.Image, &memRequirements);
+	vkGetImageMemoryRequirements(device, imageHandle, &memRequirements);
 
 	VkMemoryAllocateInfo allocInfo;
 	ZeroInitVkStruct(allocInfo, VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO);
@@ -230,22 +201,26 @@ void Image2D::CreateImage()
 	allocInfo.allocationSize = memRequirements.size;
 	allocInfo.memoryTypeIndex = physicalDevice.GetMemoryType(memRequirements.memoryTypeBits, m_Description.Properties);
 
-	result = vkAllocateMemory(device, &allocInfo, nullptr, &m_Image.Memory);
-	VK_CHECK_RESULT(result);
-	ASSERT(m_Image.Memory, "Failed to allocate image memory");
+	auto& memoryHandle = Handle::GetHandle<VkDeviceMemory>();
 
-	result = vkBindImageMemory(device, m_Image.Image, m_Image.Memory, 0);
+	result = vkAllocateMemory(device, &allocInfo, nullptr, &memoryHandle);
+	VK_CHECK_RESULT(result);
+	ASSERT(memoryHandle, "Failed to allocate image memory");
+
+	result = vkBindImageMemory(device, imageHandle, memoryHandle, 0);
 	VK_CHECK_RESULT(result);
 }
 
 void Image2D::CreateImageView()
 {
-	ASSERT(m_Image.Image);
+	auto& imageHandle = Handle::GetHandle<VkImage>();
+
+	ASSERT(imageHandle);
 
 	VkImageViewCreateInfo viewInfo;
 	ZeroInitVkStruct(viewInfo, VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO);
 
-	viewInfo.image = m_Image.Image;
+	viewInfo.image = imageHandle;
 	viewInfo.viewType = m_Description.ViewType;
 	viewInfo.format = Convert(m_Description.Format);
 	viewInfo.subresourceRange.aspectMask = m_Description.ImageAspectFlags;
@@ -254,9 +229,11 @@ void Image2D::CreateImageView()
 	viewInfo.subresourceRange.baseArrayLayer = 0;
 	viewInfo.subresourceRange.layerCount = m_Description.ImageCount;
 
-	VkResult result = vkCreateImageView(Context::GetDevice().GetHandle(), &viewInfo, nullptr, &m_Image.ImageView);
+	auto& imageViewHandle = Handle::GetHandle<VkImageView>();
+
+	VkResult result = vkCreateImageView(Context::GetDevice().GetHandle(), &viewInfo, nullptr, &imageViewHandle);
 	VK_CHECK_RESULT(result);
-	ASSERT(m_Image.ImageView, "ImageView creation failed");
+	ASSERT(imageViewHandle, "ImageView creation failed");
 }
 
 void Image2D::GenerateMipMaps()
@@ -274,7 +251,9 @@ void Image2D::GenerateMipMaps()
 	VkImageMemoryBarrier barrier;
 	ZeroInitVkStruct(barrier, VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER);
 
-	barrier.image = m_Image.Image;
+	auto& imageHandle = Handle::GetHandle<VkImage>();
+
+	barrier.image = imageHandle;
 	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -315,7 +294,7 @@ void Image2D::GenerateMipMaps()
 		blit.dstSubresource.baseArrayLayer = 0;
 		blit.dstSubresource.layerCount = m_Description.ImageCount;
 
-		vkCmdBlitImage(commandBuffer->GetHandle(), m_Image.Image, layoutTransferSrcOptimal, m_Image.Image, layoutTransferDstOptimal, 1, &blit, VK_FILTER_LINEAR);
+		vkCmdBlitImage(commandBuffer->GetHandle(), imageHandle, layoutTransferSrcOptimal, imageHandle, layoutTransferDstOptimal, 1, &blit, VK_FILTER_LINEAR);
 
 		barrier.oldLayout = layoutTransferSrcOptimal;
 		barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;

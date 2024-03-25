@@ -64,6 +64,9 @@ public:
 
 	CommandBuffer& GetCurrentCommandBuffer() const;
 	CommandBuffer& GetCurrentCommandBuffer();
+
+	// TODO: Temp until find a solution for ImGui
+	const Framebuffer& GetCurrentFramebuffer() const;
 private:
 	void CreateSwapchain();
 	void CreateImagesAndViews();

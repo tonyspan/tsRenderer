@@ -101,8 +101,13 @@ TextureType Texture::GetType() const
 	return m_Type;
 }
 
-uint32_t Texture::GenerateMips(uint32_t width, uint32_t height)
+uint32_t Texture::GenerateMips()
 {
+	const uint32_t width = m_Description.Width;
+	const uint32_t height = m_Description.Height;
+
+	ASSERT(m_Description.Width != 0 && m_Description.Height != 0);
+
 	return static_cast<uint32_t>(glm::floor(std::log2(glm::max(width, height)))) + 1;
 }
 
@@ -165,7 +170,7 @@ void Texture2D::CreateTexture(void** data)
 
 	desc.Width = width;
 	desc.Height = height;
-	desc.MipLevels = texDesc.GenerateMipLevels ? GenerateMips(width, height) : 1;
+	desc.MipLevels = texDesc.GenerateMipLevels ? GenerateMips() : 1;
 	desc.ImageCount = s_ImageCount;
 	desc.MSAAnumSamples = 1;
 	desc.Format = texDesc.Format;
@@ -183,11 +188,9 @@ void Texture2D::CreateTexture(void** data)
 
 void Texture2D::CreateSampler()
 {
-	const auto& texDesc = Texture::GetDescription();
-
 	SamplerDescription desc;
 
-	desc.MipLevels = texDesc.GenerateMipLevels ? GenerateMips(texDesc.Width, texDesc.Height) : 1;
+	desc.MipLevels = Texture::GetDescription().GenerateMipLevels ? GenerateMips() : 1;
 	desc.MagFilter = Filter::NEAREST;
 	desc.MinFilter = Filter::NEAREST;
 
@@ -253,7 +256,7 @@ void TextureCube::CreateCube(void** data)
 
 	desc.Width = width;
 	desc.Height = height;
-	desc.MipLevels = texDesc.GenerateMipLevels ? GenerateMips(width, height) : 1;
+	desc.MipLevels = texDesc.GenerateMipLevels ? GenerateMips() : 1;
 	desc.ImageCount = s_ImageCount;
 	desc.MSAAnumSamples = 1;
 	desc.Format = texDesc.Format;
@@ -271,11 +274,9 @@ void TextureCube::CreateCube(void** data)
 
 void TextureCube::CreateSampler()
 {
-	const auto& texDesc = Texture::GetDescription();
-
 	SamplerDescription desc;
 
-	desc.MipLevels = texDesc.GenerateMipLevels ? GenerateMips(texDesc.Width, texDesc.Height) : 1;
+	desc.MipLevels = Texture::GetDescription().GenerateMipLevels ? GenerateMips() : 1;
 	desc.MagFilter = Filter::NEAREST;
 	desc.MinFilter = Filter::NEAREST;
 

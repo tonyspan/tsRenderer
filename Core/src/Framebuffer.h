@@ -9,15 +9,24 @@
 #include <glm/glm.hpp>
 
 #include <span>
+#include <optional>
 
 class Image2D;
 class RenderPass;
+
+struct FramebufferAttachment
+{
+	AttachmentType AttachType = AttachmentType::UNDEFINED;
+	Format Format = Format::UNDEFINED;
+	TextureType TexType = TextureType::TEXTURE;
+};
 
 struct FramebufferDescription
 {
 	uint32_t Width = 0;
 	uint32_t Height = 0;
 	glm::vec4 ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
+	std::optional<uint8_t> MSAAnumSamples = {};
 
 	RenderPass* RenderPass = nullptr;
 	std::span<const Image2D* const> Attachments;

@@ -185,7 +185,7 @@ private:
 		{
 			const auto assetName = s_AssetsNames[i];
 			commandBuffer.BindPipeline(*m_Pipelines[assetName]);
-			commandBuffer.BindDescriptorSet(m_Pipelines[assetName]->GetLayout(), m_DescriptorSets.find(assetName)->second->GetDescriptorSet());
+			commandBuffer.BindDescriptorSet(*(m_DescriptorSets.find(assetName)->second));
 
 			if (i == 1)
 			{

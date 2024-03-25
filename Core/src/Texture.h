@@ -27,7 +27,7 @@ public:
 	virtual ~Texture() = default;
 
 	TextureType GetType() const;
-	uint32_t GenerateMips(uint32_t width, uint32_t height);
+	uint32_t GenerateMips();
 
 	const TextureDescription& GetDescription() const;
 private:

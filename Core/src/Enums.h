@@ -38,7 +38,7 @@ enum class MSAASamples
 {
 };
 
-VkSampleCountFlagBits Convert(uint32_t msaaNumSamples);
+VkSampleCountFlagBits Convert(uint8_t msaaNumSamples);
 
 enum class StageFlag : int
 {
@@ -152,3 +152,12 @@ enum class Filter
 };
 
 VkFilter Convert(Filter filter);
+
+enum class AttachmentType
+{
+	UNDEFINED = 0,
+
+	COLOR,
+	DEPTH,
+	DEPTH_STNCIL
+};

@@ -8,23 +8,13 @@
 #include "Shader.h"
 #include "Vertex.h"
 #include "Layout.h"
+#include "Framebuffer.h"
 
 #include "Log.h"
 
 #include <vulkan/vulkan.h>
 
 #include <array>
-
-PipelineDescription::PipelineDescription()
-	: DescSetLayout(nullptr)
-	, BufferLayout(nullptr)
-	, CompareOp(CompareOp::LESS)
-	, PolygonMode(PolygonMode::FILL)
-	, CullMode(CullMode::BACK)
-	, Topology(PrimitiveTopology::TRIANGLE_LIST)
-	, TransparencyEnabled(false)
-{
-}
 
 Ref<Pipeline> Pipeline::Create(const PipelineDescription& desc)
 {
@@ -40,20 +30,16 @@ Pipeline::~Pipeline()
 {
 	const auto& device = Context::GetDevice().GetHandle();
 
-	vkDestroyPipelineLayout(device, m_PipelineLayout, nullptr);
-	vkDestroyPipeline(device, Handle::GetHandle(), nullptr);
-}
-
-VkPipelineLayout Pipeline::GetLayout() const
-{
-	return m_PipelineLayout;
+	vkDestroyPipelineLayout(device, Handle::GetHandle<VkPipelineLayout>(), nullptr);
+	vkDestroyPipeline(device, Handle::GetHandle<VkPipeline>(), nullptr);
 }
 
 void Pipeline::CreatePipeline(const PipelineDescription& desc)
 {
 	const auto& vkDevice = Context::GetDevice().GetHandle();
-	const auto& msaaSamples = Context::GetDevice().GetPhysicalDevice().GetMsaaSamples();
-	const auto& swapchainDesc = Context::GetSwapchain().GetDescription();
+	const auto& swapchain = Context::GetSwapchain();
+	const auto& msaaSamples = swapchain.GetCurrentFramebuffer().GetDescription().MSAAnumSamples;
+	const auto& swapchainDesc = swapchain.GetDescription();
 	const auto& renderPass = Context::GetSwapchain().GetRenderPass();
 
 #define OLD_WAY 0
@@ -141,9 +127,11 @@ void Pipeline::CreatePipeline(const PipelineDescription& desc)
 	VkPipelineMultisampleStateCreateInfo multisampling;
 	ZeroInitVkStruct(multisampling, VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO);
 
+	ASSERT(msaaSamples.has_value());
+
 	multisampling.sampleShadingEnable = VK_TRUE;
 	multisampling.minSampleShading = 0.2f;
-	multisampling.rasterizationSamples = msaaSamples;
+	multisampling.rasterizationSamples = msaaSamples > 1 ? Convert(msaaSamples.value()) : VK_SAMPLE_COUNT_1_BIT;
 
 	const bool isTransparencyEnabled = desc.TransparencyEnabled;
 
@@ -176,9 +164,11 @@ void Pipeline::CreatePipeline(const PipelineDescription& desc)
 		pipelineLayoutInfo.pSetLayouts = descriptorSetLayout.data();
 	}
 
-	VkResult result = vkCreatePipelineLayout(vkDevice, &pipelineLayoutInfo, nullptr, &m_PipelineLayout);
+	auto& pipelineLayoutHandle = Handle::GetHandle<VkPipelineLayout>();
+
+	VkResult result = vkCreatePipelineLayout(vkDevice, &pipelineLayoutInfo, nullptr, &pipelineLayoutHandle);
 	VK_CHECK_RESULT(result);
-	ASSERT(m_PipelineLayout, "Pipeline layout creation failed");
+	ASSERT(pipelineLayoutHandle, "Pipeline layout creation failed");
 
 	VkPipelineDepthStencilStateCreateInfo depthStencil;
 	ZeroInitVkStruct(depthStencil, VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO);
@@ -214,13 +204,15 @@ void Pipeline::CreatePipeline(const PipelineDescription& desc)
 	pipelineInfo.pMultisampleState = &multisampling;
 	pipelineInfo.pDepthStencilState = &depthStencil;
 	pipelineInfo.pColorBlendState = &colorBlending;
-	pipelineInfo.layout = m_PipelineLayout;
+	pipelineInfo.layout = pipelineLayoutHandle;
 	pipelineInfo.renderPass = renderPass->GetHandle();
 	pipelineInfo.subpass = 0;
 
-	result = vkCreateGraphicsPipelines(vkDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &Handle::GetHandle());
+	auto& pipelineHandle = Handle::GetHandle<VkPipeline>();
+
+	result = vkCreateGraphicsPipelines(vkDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipelineHandle);
 	VK_CHECK_RESULT(result);
-	ASSERT(Handle::GetHandle(), "Grapphics pipeline creation failed");
+	ASSERT(pipelineHandle, "Grapphics pipeline creation failed");
 
 	// Unnecessary
 	for (auto& shader : shaders)

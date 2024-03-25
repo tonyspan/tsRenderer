@@ -50,18 +50,8 @@ uint32_t FormatBytesPerPixel(Format format)
 	return 0;
 }
 
-static bool CheckMSAASamples(uint32_t msaaNumSamples)
+VkSampleCountFlagBits Convert(uint8_t msaaNumSamples)
 {
-	if ((msaaNumSamples == 1) || (msaaNumSamples == 2) || (msaaNumSamples == 4) || (msaaNumSamples == 8))
-		return true;
-
-	return false;
-}
-
-VkSampleCountFlagBits Convert(uint32_t msaaNumSamples)
-{
-	ASSERT(CheckMSAASamples(msaaNumSamples), "Invalid MSAA sample count");
-
 #define MSAA_NUM_SAMPLE_CASE(msaaNumSample) \
 	case msaaNumSample: return VK_SAMPLE_COUNT_##msaaNumSample##_BIT
 

@@ -134,6 +134,11 @@ CommandBuffer& Swapchain::GetCurrentCommandBuffer()
 	return *GetFrameData(m_ImageIndex).CommandBuffer;
 }
 
+const Framebuffer& Swapchain::GetCurrentFramebuffer() const
+{
+	return *GetFrameData(m_ImageIndex).Framebuffer;
+}
+
 void Swapchain::CreateSwapchain()
 {
 	ASSERT(m_Description.FramesInFlight > 0, STR(m_Description.FramesInFlight) " <= 0");
@@ -208,7 +213,6 @@ void Swapchain::CreateImagesAndViews()
 	ImageDescription desc;
 
 	desc.Format = format;
-	desc.MSAAnumSamples = 1;
 	desc.ImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
 	desc.ViewType = VK_IMAGE_VIEW_TYPE_2D;
 	desc.MipLevels = 1;
@@ -226,6 +230,10 @@ void Swapchain::CreateImagesAndViews()
 	swapchainImages = nullptr;
 }
 
+// TODO: Find a better way
+// This setting affects Pipeline, RenderPass, ImGui
+static constexpr uint8_t s_MSAA = 1;
+
 void Swapchain::CreateColorResources()
 {
 	Format format = Format::BGRA_8_SRGB;
@@ -237,7 +245,7 @@ void Swapchain::CreateColorResources()
 	desc.Height = m_Description.Height;
 	desc.MipLevels = 1;
 	desc.ImageCount = 1;
-	desc.MSAAnumSamples = 8; // MUST be 8 since Pipeline uses the samples from m_Device.GetPhysicalDevice().GetMsaaSamples()
+	desc.MSAAnumSamples = s_MSAA;
 	desc.Format = format;
 	desc.ImageUsage = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 	desc.ImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -259,7 +267,7 @@ void Swapchain::CreateDepthResources()
 	desc.Height = m_Description.Height;
 	desc.MipLevels = 1;
 	desc.ImageCount = 1;
-	desc.MSAAnumSamples = 8; // MUST be 8 since Pipeline uses the samples from m_Device.GetPhysicalDevice().GetMsaaSamples()
+	desc.MSAAnumSamples = s_MSAA;
 	desc.Format = format;
 	desc.ImageUsage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 	desc.ImageAspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT;
@@ -274,7 +282,17 @@ void Swapchain::CreateRenderPass()
 {
 	RenderPassDescription desc;
 
-	std::array<const Image2D* const, 3> attachments = { m_ColorImage.get(), m_DepthImage.get(), GetImage(0) };
+	desc.MSAAnumSamples = s_MSAA;
+
+	std::array<const Image2D*, 3> attachments{};
+	if constexpr (s_MSAA > 1)
+	{
+		attachments = { m_ColorImage.get(), m_DepthImage.get(), GetImage(0) };
+	}
+	else
+	{
+		attachments = { GetImage(0), m_DepthImage.get() };
+	}
 
 	desc.Attachments = attachments;
 
@@ -289,10 +307,19 @@ void Swapchain::CreateFramebuffers()
 	desc.Height = m_Description.Height;
 	desc.ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
 	desc.RenderPass = m_RenderPass.get();
+	desc.MSAAnumSamples = s_MSAA;
 
 	for (uint32_t i = 0; i < m_FrameData.size(); i++)
 	{
-		std::array<const Image2D*, 3> attachments = { m_ColorImage.get(), m_DepthImage.get(), GetImage(i) };
+		std::array<const Image2D*, 3> attachments{};
+		if constexpr (s_MSAA > 1)
+		{
+			attachments = { m_ColorImage.get(), m_DepthImage.get(), GetImage(i) };
+		}
+		else
+		{
+			attachments = { GetImage(i), m_DepthImage.get() };
+		}
 
 		desc.Attachments = attachments;
 

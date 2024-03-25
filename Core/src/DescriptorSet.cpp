@@ -66,7 +66,7 @@ void DescriptorSet::SetBuffer(uint32_t binding, const Buffer& buffer)
 
 	for (uint32_t i = 0; i < imageCount; i++)
 	{
-		bufferInfo.buffer = buffer.GetHandle();
+		bufferInfo.buffer = buffer.GetHandle<VkBuffer>();
 		bufferInfo.offset = 0;
 		bufferInfo.range = VK_WHOLE_SIZE;
 
@@ -102,7 +102,7 @@ void DescriptorSet::SetTexture(uint32_t binding, const Texture& texture)
 		case TextureType::TEXTURE:
 		{
 			const auto& texture2D = static_cast<const Texture2D&>(texture);
-			imageInfo.imageView = texture2D.GetImage().GetImageViewHandle();
+			imageInfo.imageView = texture2D.GetImage().GetHandle<VkImageView>();
 			imageInfo.sampler = texture2D.GetSampler().GetHandle();
 
 			break;
@@ -110,7 +110,7 @@ void DescriptorSet::SetTexture(uint32_t binding, const Texture& texture)
 		case TextureType::CUBE:
 		{
 			const auto& textureCube = static_cast<const TextureCube&>(texture);
-			imageInfo.imageView = textureCube.GetImage().GetImageViewHandle();
+			imageInfo.imageView = textureCube.GetImage().GetHandle<VkImageView>();
 			imageInfo.sampler = textureCube.GetSampler().GetHandle();
 
 			break;

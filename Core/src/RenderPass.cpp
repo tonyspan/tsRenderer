@@ -58,57 +58,105 @@ void RenderPass::End(const CommandBuffer& commandBuffer)
 
 void RenderPass::CreateRenderPass(const RenderPassDescription& desc)
 {
-	const auto& physicalDevice = Context::GetDevice().GetPhysicalDevice();
+	ASSERT(desc.MSAAnumSamples.has_value());
+
 	const auto& descAttachments = desc.Attachments;
 
-	std::array<VkAttachmentDescription, 3> attachments{};
-	std::array<VkAttachmentReference, attachments.size()> attachmentRefs{};
+	const bool isMultisampled = desc.MSAAnumSamples > 1;
+	const size_t size = isMultisampled ? descAttachments.size() : 2;
 
-	ASSERT(descAttachments.size() == attachments.size());
+	std::vector<VkAttachmentDescription> attachments(size, VkAttachmentDescription{});
+	std::vector<VkAttachmentReference> attachmentRefs(size, VkAttachmentReference{});
 
-	VkFormat vkFormat = VK_FORMAT_UNDEFINED;
+	if (!isMultisampled)
+	{
+		const auto sampleCount = Convert(desc.MSAAnumSamples.value());
+		ASSERT(VK_SAMPLE_COUNT_1_BIT == sampleCount);
 
-	// Color
-	const auto colorImage = descAttachments[0];
-	vkFormat = Convert(colorImage->GetFormat());
-	attachments[0].format = vkFormat;
-	attachments[0].samples = Convert(colorImage->GetMSAAsamples());
-	attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-	attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	attachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		// Color/Swapchain
+		attachments[0] =
+		{
+			  .flags = {},
+			  .format = Convert(descAttachments[0]->GetFormat()),
+			  .samples = sampleCount,
+			  .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+			  .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+			  .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+			  .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+			  .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+			  .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+		};
 
-	attachmentRefs[0] = { .attachment = 0, .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+		attachmentRefs[0] = { .attachment = 0, .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
 
-	// Depth
-	const auto depthImage = descAttachments[1];
-	vkFormat = Convert(depthImage->GetFormat());
-	attachments[1].format = vkFormat;
-	attachments[1].samples = Convert(depthImage->GetMSAAsamples());
-	attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		// Depth
+		attachments[1] =
+		{
+			  .flags = {},
+			  .format = Convert(descAttachments[1]->GetFormat()),
+			  .samples = sampleCount,
+			  .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+			  .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+			  .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+			  .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+			  .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+			  .finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+		};
 
-	attachmentRefs[1] = { .attachment = 1, .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
+		attachmentRefs[1] = { .attachment = 1, .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
 
-	// Swapchain
-	const auto swapchainImage = descAttachments[2];
-	vkFormat = Convert(swapchainImage->GetFormat());
-	attachments[2].format = vkFormat;
-	attachments[2].samples = Convert(swapchainImage->GetMSAAsamples());
-	attachments[2].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	attachments[2].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-	attachments[2].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	attachments[2].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	attachments[2].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	attachments[2].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		ASSERT(!descAttachments[2], "Must be invalid");
+	}
+	else
+	{
+		// Color/Multisampled
+		attachments[0] =
+		{
+			   .flags = {},
+			   .format = Convert(descAttachments[0]->GetFormat()),
+			   .samples = Convert(desc.MSAAnumSamples.value()),
+			   .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+			   .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+			   .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+			   .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+			   .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+			   .finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+		};
 
-	attachmentRefs[2] = { .attachment = 2, .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+		attachmentRefs[0] = { .attachment = 0, .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+
+		// Depth
+		attachments[1] =
+		{
+			.flags = {},
+			.format = Convert(descAttachments[1]->GetFormat()),
+			.samples = Convert(desc.MSAAnumSamples.value()),
+			.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+			.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+			.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+			.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+			.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+			.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+		};
+
+		attachmentRefs[1] = { .attachment = 1, .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
+
+		// Color/Swapchain
+		attachments[2] =
+		{
+			.flags = {},
+			.format = Convert(descAttachments[2]->GetFormat()),
+			.samples = VK_SAMPLE_COUNT_1_BIT,
+			.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+			.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+			.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+			.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+			.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+			.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+		};
+
+		attachmentRefs[2] = { .attachment = 2, .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+	}
 
 	std::array<VkSubpassDescription, 1> subpasses{};
 
@@ -116,7 +164,7 @@ void RenderPass::CreateRenderPass(const RenderPassDescription& desc)
 	subpasses[0].colorAttachmentCount = 1;
 	subpasses[0].pColorAttachments = &attachmentRefs[0];
 	subpasses[0].pDepthStencilAttachment = &attachmentRefs[1];
-	subpasses[0].pResolveAttachments = &attachmentRefs[2];
+	subpasses[0].pResolveAttachments = isMultisampled ? &attachmentRefs[2] : nullptr;
 
 	std::array<VkSubpassDependency, 1> dependencies{};
 

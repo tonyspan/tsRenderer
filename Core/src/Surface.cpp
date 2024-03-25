@@ -45,6 +45,8 @@ const VkSurfaceFormatKHR Surface::GetFormat(const PhysicalDevice& device) const
 
 	for (const auto& availableFormat : availableFormats)
 	{
+		// ImGui doesn't like SRGB
+		// See more: https://github.com/ocornut/imgui/issues/6583
 		if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
 			return availableFormat;
 	}

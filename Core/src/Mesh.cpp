@@ -84,7 +84,6 @@ Ref<Mesh> Mesh::Create(const Ref<Buffer>& vb, const Ref<Buffer>& ib)
 }
 
 Mesh::Mesh(const std::span<Vertex> vertices, const std::span<uint32_t> indices)
-	: m_Count(static_cast<uint32_t>(indices.size()))
 {
 	const uint64_t verticesSize = static_cast<uint64_t>(sizeof(Vertex) * vertices.size());
 	const uint64_t indicesSize = static_cast<uint64_t>(sizeof(uint32_t) * indices.size());
@@ -92,14 +91,13 @@ Mesh::Mesh(const std::span<Vertex> vertices, const std::span<uint32_t> indices)
 	m_VertexBuffer = Buffer::CreateVertex(verticesSize);
 	m_VertexBuffer->SetData(static_cast<const void*>(vertices.data()), verticesSize);
 
-	m_IndexBuffer = Buffer::CreateIndex(indicesSize);
+	m_IndexBuffer = Buffer::CreateIndex(indicesSize, static_cast<uint32_t>(indices.size()));
 	m_IndexBuffer->SetData(static_cast<const void*>(indices.data()), indicesSize);
 }
 
 Mesh::Mesh(const Ref<Buffer>& vb, const Ref<Buffer>& ib)
 	: m_VertexBuffer(vb), m_IndexBuffer(ib)
 {
-	m_Count = ib->GetDescription().Size / sizeof(uint32_t);
 }
 
 Mesh::~Mesh()
@@ -115,16 +113,22 @@ void Mesh::SetName(const std::string_view name)
 
 const Buffer& Mesh::GetVertexBuffer() const
 {
+	ASSERT(m_VertexBuffer);
+
 	return *m_VertexBuffer;
 }
 
 const Buffer& Mesh::GetIndexBuffer() const
 {
+	ASSERT(m_IndexBuffer);
+
 	return *m_IndexBuffer;
 }
 
 uint32_t Mesh::GetIndexCount() const
 {
-	return m_Count;
+	ASSERT(m_IndexBuffer);
+
+	return m_IndexBuffer->GetDescription().IndexCount;
 }
 

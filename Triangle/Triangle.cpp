@@ -24,7 +24,7 @@ protected:
 		std::vector<uint32_t> indices = { 0, 1, 2 };
 
 		m_VertexBuffer = Buffer::CreateVertex(vertices.size() * sizeof(Triangle::Vertex), vertices.data());
-		m_IndexBuffer = Buffer::CreateIndex(indices.size() * sizeof(uint32_t), indices.data());
+		m_IndexBuffer = Buffer::CreateIndex(indices.size() * sizeof(uint32_t), static_cast<uint32_t>(indices.size()), indices.data());
 
 		PipelineDescription desc;
 

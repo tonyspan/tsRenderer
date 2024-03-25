@@ -39,12 +39,16 @@ void Framebuffer::CreateFramebuffer()
 
 	ASSERT(renderPass, "RenderPass must be valid");
 	ASSERT(m_Description.Width != 0 && m_Description.Height != 0, STR(m_Description.Width, m_Description.Height) " aren't set properly");
+	ASSERT(m_Description.MSAAnumSamples.has_value());
 
 	const auto& descAttachments = m_Description.Attachments;
 
-	std::vector<VkImageView> attachments(descAttachments.size());
-	for (size_t i = 0; i < descAttachments.size(); i++)
-		attachments[i] = descAttachments[i]->GetImageViewHandle();
+	std::vector<VkImageView> attachments{};
+	for (const auto attachment : descAttachments)
+	{
+		if (attachment)
+			attachments.push_back(attachment->GetHandle<VkImageView>());
+	}
 
 	VkFramebufferCreateInfo framebufferInfo;
 	ZeroInitVkStruct(framebufferInfo, VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO);

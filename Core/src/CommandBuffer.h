@@ -7,6 +7,7 @@
 class CommandBuffer;
 class Buffer;
 class Pipeline;
+class DescriptorSet;
 
 class CommandBuffer : public Handle<VkCommandBuffer>
 {
@@ -23,7 +24,7 @@ public:
 	void BeginSingleTime();
 	void EndSingleTime();
 
-	void BindDescriptorSet(VkPipelineLayout layout, VkDescriptorSet set);
+	void BindDescriptorSet(const DescriptorSet& set);
 	void BindVertexBuffer(const Buffer& buffer);
 	void BindIndexBuffer(const Buffer& buffer);
 	void BindPipeline(const Pipeline& pipeline);
@@ -32,4 +33,6 @@ public:
 	void DrawIndexed(uint32_t indexCount, uint32_t firstIndex = 0);
 private:
 	void CreateCommandBuffer(bool isPrimary);
+private:
+	const Pipeline* m_BoundPipeline = nullptr;
 };

@@ -31,7 +31,4 @@ private:
 
 	Ref<Buffer> m_VertexBuffer;
 	Ref<Buffer> m_IndexBuffer;
-
-	// TODO: Temporary, probably IndexBuffer class is needed
-	uint32_t m_Count = 0;
 };

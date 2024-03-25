@@ -110,7 +110,7 @@ protected:
 
 		commandBuffer.BindVertexBuffer(*m_VertexBuffer);
 
-		commandBuffer.BindDescriptorSet(m_Pipeline->GetLayout(), m_DS->GetDescriptorSet());
+		commandBuffer.BindDescriptorSet(*m_DS);
 
 		commandBuffer.Draw(36);
 	}
