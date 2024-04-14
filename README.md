@@ -11,14 +11,18 @@ This project is my implementation/abstraction of a Vulkan renderer. Everything i
 * Various videos, blogs and repos
 
 ## Dependencies
-* [`SDL2`](https://www.libsdl.org/)
+* ~[`SDL2`](https://www.libsdl.org/)~ [`GLFW`](https://www.glfw.org/)
 * [`glm`](https://github.com/g-truc/glm)
 * [`imgui`](https://github.com/ocornut/imgui)
 * [`stb`](https://github.com/nothings/stb)
 * [`tinyobjloader`](https://github.com/tinyobjloader/tinyobjloader)
+* [`volk`](https://github.com/zeux/volk)
+* [`Vulkan-Headers`](https://github.com/KhronosGroup/Vulkan-Headers)
+* [`Glslang`](https://github.com/KhronosGroup/glslang) using the [`release binaries`](https://github.com/KhronosGroup/glslang/releases/tag/main-tot)
+* [`SPIRV-Reflect`](https://github.com/KhronosGroup/SPIRV-Reflect)
+* [`Vulkan-Utility-Libraries`](https://github.com/KhronosGroup/Vulkan-Utility-Libraries) for `vk_enum_string_helper.h`
 
 # Prerequisites
-* [`Vulkan SDK`](https://vulkan.lunarg.com/sdk/home) (It will be downloaded if not present)
 * Python 3 (Required)
 
 ## Getting Started

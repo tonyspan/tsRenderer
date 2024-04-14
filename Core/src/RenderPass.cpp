@@ -9,6 +9,7 @@
 
 #include "Log.h"
 
+#include <volk.h>
 #include <vulkan/vulkan.h>
 
 #include <array>
@@ -19,8 +20,9 @@ Ref<RenderPass> RenderPass::Create(const RenderPassDescription& desc)
 }
 
 RenderPass::RenderPass(const RenderPassDescription& desc)
+	: m_Description(desc)
 {
-	CreateRenderPass(desc);
+	CreateRenderPass();
 }
 
 RenderPass::~RenderPass()
@@ -56,13 +58,21 @@ void RenderPass::End(const CommandBuffer& commandBuffer)
 	vkCmdEndRenderPass(commandBuffer.GetHandle());
 }
 
-void RenderPass::CreateRenderPass(const RenderPassDescription& desc)
+const RenderPassDescription& RenderPass::GetDescription() const
 {
-	ASSERT(desc.MSAAnumSamples.has_value());
+	return m_Description;
+}
 
-	const auto& descAttachments = desc.Attachments;
+void RenderPass::CreateRenderPass()
+{
+	ASSERT(m_Description.MSAAnumSamples.has_value());
 
-	const bool isMultisampled = desc.MSAAnumSamples > 1;
+	const auto& descAttachments = m_Description.Attachments;
+
+	const bool isMultisampled = m_Description.MSAAnumSamples > 1;
+	const auto& msaaSamplesValue = m_Description.MSAAnumSamples.value();
+	const auto vkSampleCount = Convert(msaaSamplesValue);
+
 	const size_t size = isMultisampled ? descAttachments.size() : 2;
 
 	std::vector<VkAttachmentDescription> attachments(size, VkAttachmentDescription{});
@@ -70,15 +80,14 @@ void RenderPass::CreateRenderPass(const RenderPassDescription& desc)
 
 	if (!isMultisampled)
 	{
-		const auto sampleCount = Convert(desc.MSAAnumSamples.value());
-		ASSERT(VK_SAMPLE_COUNT_1_BIT == sampleCount);
+		ASSERT(VK_SAMPLE_COUNT_1_BIT == vkSampleCount);
 
 		// Color/Swapchain
 		attachments[0] =
 		{
 			  .flags = {},
 			  .format = Convert(descAttachments[0]->GetFormat()),
-			  .samples = sampleCount,
+			  .samples = vkSampleCount,
 			  .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
 			  .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
 			  .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
@@ -94,7 +103,7 @@ void RenderPass::CreateRenderPass(const RenderPassDescription& desc)
 		{
 			  .flags = {},
 			  .format = Convert(descAttachments[1]->GetFormat()),
-			  .samples = sampleCount,
+			  .samples = vkSampleCount,
 			  .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
 			  .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
 			  .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
@@ -114,7 +123,7 @@ void RenderPass::CreateRenderPass(const RenderPassDescription& desc)
 		{
 			   .flags = {},
 			   .format = Convert(descAttachments[0]->GetFormat()),
-			   .samples = Convert(desc.MSAAnumSamples.value()),
+			   .samples = vkSampleCount,
 			   .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
 			   .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
 			   .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
@@ -130,7 +139,7 @@ void RenderPass::CreateRenderPass(const RenderPassDescription& desc)
 		{
 			.flags = {},
 			.format = Convert(descAttachments[1]->GetFormat()),
-			.samples = Convert(desc.MSAAnumSamples.value()),
+			.samples = vkSampleCount,
 			.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
 			.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
 			.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,

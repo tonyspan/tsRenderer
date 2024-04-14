@@ -9,7 +9,7 @@ Ref<Skybox> Skybox::Create(const std::string_view meshPath, const std::array<std
 }
 
 Skybox::Skybox(const std::string_view meshPath, const std::array<std::string_view, 6>& paths)
-	: m_Mesh(Mesh::Create(meshPath)), m_Texture(TextureCube::Create(paths))
+	: m_Mesh(Mesh::Create(meshPath)), m_Texture(Texture::Create(paths))
 {
 }
 
@@ -24,7 +24,7 @@ const Mesh& Skybox::GetMesh() const
 	return *m_Mesh;
 }
 
-const TextureCube& Skybox::GetTexture() const
+const Texture& Skybox::GetTexture() const
 {
 	return *m_Texture;
 }

@@ -1,19 +1,15 @@
-project "tinyobjloader"
-    location "tinyobjloader"
-    kind "None"
-    language "C++"
+project "SPIRV-Reflect"
+    location "SPIRV-Reflect"
+    kind "StaticLib"
+    language "C"
 
     targetdir ("%{wks.location}/bin/" .. outputdir .. "/%{prj.name}")
 	objdir ("%{wks.location}/bin-int/" .. outputdir .. "/%{prj.name}")
 
     files
     {
-        "tinyobjloader/**.hpp",
-        "tinyobjloader/**.h"
-    }
-
-    includedirs
-    {
+		"SPIRV-Reflect/spirv_reflect.c",
+		"SPIRV-Reflect/spirv_reflect.h",
     }
 
 	filter "system:windows"

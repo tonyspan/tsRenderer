@@ -18,7 +18,7 @@ protected:
 		const auto& [width, height] = Application::GetSize();
 		m_Camera = Camera(float(width) / float(height));
 
-		Shader::CompileShaders(GetProjectDirectory() + "/Shaders/");
+		ShaderCompiler::CompileWithValidator(GetProjectDirectory() + "/Shaders/");
 
 		Layout layout;
 		layout.Add<glm::vec3>("inPosition");
@@ -68,10 +68,10 @@ protected:
 				 {.Position = { -0.5f,  0.5f,  0.5f }, .TexCoord = { 0.0f, 0.0f } }
 		};
 
-		m_VertexBuffer = Buffer::CreateVertex(vertices.size() * sizeof(Cube::Vertex), vertices.data());
-		m_UniformBuffer = Buffer::CreateUniform(sizeof(Cube::UBO));
+		m_VertexBuffer = GBuffer::CreateVertex(vertices.size() * sizeof(Cube::Vertex), vertices.data());
+		m_UniformBuffer = GBuffer::CreateUniform(sizeof(Cube::UBO));
 
-		m_Texture = Texture2D::Create("Textures/container.jpg");
+		m_Texture = Texture::Create("Textures/container.jpg");
 
 		m_DS = DescriptorSet::Create({
 			{.Name = "UBO", .Binding = 0, .Type = DescriptorType::UNIFORM_BUFFER, .Stage = StageFlag::VERTEX },
@@ -79,7 +79,7 @@ protected:
 			});
 
 		m_DS->SetBuffer(0, *m_UniformBuffer);
-		m_DS->SetTexture(1, static_cast<const Texture&>(*m_Texture));
+		m_DS->SetTexture(1, *m_Texture);
 
 		PipelineDescription desc;
 
@@ -135,9 +135,9 @@ private:
 	Camera m_Camera;
 
 	Ref<Pipeline> m_Pipeline;
-	Ref<Buffer> m_VertexBuffer;
-	Ref<Buffer> m_UniformBuffer;
-	Ref<Texture2D> m_Texture;
+	Ref<GBuffer> m_VertexBuffer;
+	Ref<GBuffer> m_UniformBuffer;
+	Ref<Texture> m_Texture;
 
 	Ref<DescriptorSet> m_DS;
 };

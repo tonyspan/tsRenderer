@@ -3,10 +3,11 @@
 #include "Context.h"
 #include "Device.h"
 #include "CommandBuffer.h"
-#include "Buffer.h"
+#include "GBuffer.h"
 
 #include "Log.h"
 
+#include <volk.h>
 #include <vulkan/vulkan.h>
 
 static bool HasStencil(VkFormat format)
@@ -125,7 +126,7 @@ void Image2D::TransitionImageLayout(VkImageLayout newLayout, VkImageLayout oldLa
 	commandBuffer->EndSingleTime();
 }
 
-void Image2D::CopyFrom(const Buffer& buffer)
+void Image2D::CopyFrom(const GBuffer& buffer)
 {
 	Ref<CommandBuffer> commandBuffer = CommandBuffer::Create(true);
 	commandBuffer->BeginSingleTime();
@@ -168,6 +169,9 @@ void Image2D::CreateImage()
 {
 	const auto& physicalDevice = Context::GetDevice().GetPhysicalDevice();
 	const auto& device = Context::GetDevice().GetHandle();
+
+	ASSERT(0 < m_Description.ImageCount);
+	ASSERT(0 < m_Description.Width && 0 < m_Description.Height);
 
 	VkImageCreateInfo imageInfo;
 	ZeroInitVkStruct(imageInfo, VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO);

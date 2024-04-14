@@ -7,9 +7,10 @@
 
 #include "Log.h"
 
+#include <volk.h>
 #include <vulkan/vulkan.h>
 
-#include <SDL_vulkan.h>
+#include <GLFW/glfw3.h>
 
 static bool IsPresentModeSupported(const std::vector<VkPresentModeKHR>& supportedModes, const VkPresentModeKHR presentMode)
 {
@@ -72,5 +73,6 @@ const VkPresentModeKHR Surface::GetPresentMode(const PhysicalDevice& device, boo
 
 void Surface::CreateSurface(const Window& window)
 {
-	SDL_Vulkan_CreateSurface(window.GetHandle<SDL_Window>(), m_Instance.GetHandle(), &Handle::GetHandle());
+	VkResult result = glfwCreateWindowSurface(m_Instance.GetHandle(), window.GetHandle<GLFWwindow>(), nullptr, &Handle::GetHandle());
+	ASSERT(VK_SUCCESS == result);
 }

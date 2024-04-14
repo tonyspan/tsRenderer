@@ -14,7 +14,6 @@ project "stb"
 
     includedirs
     {
-        "{%IncludeDir.stb}"
     }
 
 	filter "system:windows"

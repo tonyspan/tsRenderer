@@ -4,10 +4,11 @@
 
 #include "Log.h"
 
+#define VOLK_IMPLEMENTATION
+#include <volk.h>
 #include <vulkan/vulkan.h>
 
-#include <SDL.h>
-#include <SDL_vulkan.h>
+#include <GLFW/glfw3.h>
 
 std::vector<const char*> g_ValidationLayers = {
 	"VK_LAYER_KHRONOS_validation"
@@ -16,9 +17,11 @@ std::vector<const char*> g_ValidationLayers = {
 static std::vector<const char*> GetRequiredExtensions()
 {
 	uint32_t count = 0;
-	SDL_Vulkan_GetInstanceExtensions(nullptr, &count, nullptr);
-	std::vector<const char*> extensions(count);
-	SDL_Vulkan_GetInstanceExtensions(nullptr, &count, extensions.data());
+
+	auto glfwExtensions = glfwGetRequiredInstanceExtensions(&count);
+	ASSERT(glfwExtensions || 0 != count);
+
+	std::vector<const char*> extensions(glfwExtensions, glfwExtensions + count);
 
 	extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 
@@ -53,7 +56,7 @@ static bool IsValidationLayersSupported()
 	return true;
 }
 
-static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData)
+static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData)
 {
 	switch (messageSeverity)
 	{
@@ -97,7 +100,7 @@ static void PopulateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT&
 		VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
 		VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 
-	debugCreateInfo.pfnUserCallback = debugCallback;
+	debugCreateInfo.pfnUserCallback = DebugCallback;
 	debugCreateInfo.pUserData = nullptr;
 }
 
@@ -113,10 +116,17 @@ Instance::~Instance()
 	func(Handle::GetHandle(), m_DebugUtilsMessenger, nullptr);
 
 	vkDestroyInstance(Handle::GetHandle(), nullptr);
+
+	volkFinalize();
 }
 
 void Instance::CreateInstance(const Window& window)
 {
+	ASSERT(glfwVulkanSupported() == GLFW_TRUE);
+
+	VkResult result = volkInitialize();
+	ASSERT(VK_SUCCESS == result);
+
 	VkApplicationInfo appInfo;
 	ZeroInitVkStruct(appInfo, VK_STRUCTURE_TYPE_APPLICATION_INFO);
 
@@ -145,8 +155,12 @@ void Instance::CreateInstance(const Window& window)
 	PopulateDebugMessengerCreateInfo(debugCreateInfo);
 	createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&debugCreateInfo;
 
-	VkResult result = vkCreateInstance(&createInfo, nullptr, &Handle::GetHandle());
-	ASSERT(Handle::GetHandle(), "Instance creation failed");
+	auto& handle = Handle::GetHandle();
+
+	result = vkCreateInstance(&createInfo, nullptr, &handle);
+	ASSERT(handle, "Instance creation failed");
+
+	volkLoadInstance(handle);
 }
 
 void Instance::SetupDebugMessenger()

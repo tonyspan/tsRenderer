@@ -1,6 +1,6 @@
 #include "Mesh.h"
 
-#include "Buffer.h"
+#include "GBuffer.h"
 
 #include "Log.h"
 
@@ -75,7 +75,7 @@ Ref<Mesh> Mesh::Create(const std::span<Vertex> vertices, const std::span<uint32_
 	return CreateRef<Mesh>(vertices, indices);
 }
 
-Ref<Mesh> Mesh::Create(const Ref<Buffer>& vb, const Ref<Buffer>& ib)
+Ref<Mesh> Mesh::Create(const Ref<GBuffer>& vb, const Ref<GBuffer>& ib)
 {
 	if (nullptr == vb || nullptr == ib)
 		return nullptr;
@@ -88,14 +88,14 @@ Mesh::Mesh(const std::span<Vertex> vertices, const std::span<uint32_t> indices)
 	const uint64_t verticesSize = static_cast<uint64_t>(sizeof(Vertex) * vertices.size());
 	const uint64_t indicesSize = static_cast<uint64_t>(sizeof(uint32_t) * indices.size());
 
-	m_VertexBuffer = Buffer::CreateVertex(verticesSize);
+	m_VertexBuffer = GBuffer::CreateVertex(verticesSize);
 	m_VertexBuffer->SetData(static_cast<const void*>(vertices.data()), verticesSize);
 
-	m_IndexBuffer = Buffer::CreateIndex(indicesSize, static_cast<uint32_t>(indices.size()));
+	m_IndexBuffer = GBuffer::CreateIndex(indicesSize, static_cast<uint32_t>(indices.size()));
 	m_IndexBuffer->SetData(static_cast<const void*>(indices.data()), indicesSize);
 }
 
-Mesh::Mesh(const Ref<Buffer>& vb, const Ref<Buffer>& ib)
+Mesh::Mesh(const Ref<GBuffer>& vb, const Ref<GBuffer>& ib)
 	: m_VertexBuffer(vb), m_IndexBuffer(ib)
 {
 }
@@ -111,14 +111,14 @@ void Mesh::SetName(const std::string_view name)
 	m_Name = name;
 }
 
-const Buffer& Mesh::GetVertexBuffer() const
+const GBuffer& Mesh::GetVertexBuffer() const
 {
 	ASSERT(m_VertexBuffer);
 
 	return *m_VertexBuffer;
 }
 
-const Buffer& Mesh::GetIndexBuffer() const
+const GBuffer& Mesh::GetIndexBuffer() const
 {
 	ASSERT(m_IndexBuffer);
 

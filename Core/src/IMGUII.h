@@ -5,13 +5,13 @@
 class CommandBuffer;
 class Window;
 
-class Gui
+class IMGUI
 {
 public:
-	static Ref<Gui> Create(const Window& window);
+	static Ref<IMGUI> Create(const Window& window);
 
-	Gui(const Window& window);
-	~Gui() = default;
+	IMGUI(const Window& window);
+	~IMGUI() = default;
 
 	void Init(const Window& window);
 	void Shutdown();

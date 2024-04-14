@@ -1,5 +1,5 @@
-project "tinyobjloader"
-    location "tinyobjloader"
+project "volk"
+    location "volk"
     kind "None"
     language "C++"
 
@@ -8,8 +8,7 @@ project "tinyobjloader"
 
     files
     {
-        "tinyobjloader/**.hpp",
-        "tinyobjloader/**.h"
+       "volk/volk.h"
     }
 
     includedirs

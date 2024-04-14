@@ -4,124 +4,41 @@
 
 #include "Log.h"
 
-#include <imgui_impl_sdl2.h>
+#include "Event.h"
 
-#include <SDL.h>
+#include <imgui_impl_glfw.h>
 
-static bool s_SDLInitialized = false;
+#include <GLFW/glfw3.h>
 
-Window::EventHandler::EventHandler()
-	: m_Event(new SDL_Event())
-{
-}
-
-Window::EventHandler::~EventHandler()
-{
-	delete m_Event;
-	m_Event = nullptr;
-}
-
-void Window::EventHandler::Register(EventType type, EventCallbackFn&& cb)
-{
-	if (m_Callbacks.contains(type))
-	{
-		LOG("Event already registered");
-		return;
-	}
-
-	m_Callbacks[type] = cb;
-}
-
-void Window::EventHandler::Poll()
-{
-	while (SDL_PollEvent(m_Event))
-	{
-		ImGui_ImplSDL2_ProcessEvent(m_Event);
-
-		ImGuiIO& io = ImGui::GetIO();
-		if (io.WantCaptureMouse || io.WantCaptureKeyboard)
-			return;
-
-		Event event;
-		EventType eventType = EventType::UNDEFINED;
-		switch (m_Event->type)
-		{
-		case SDL_QUIT:
-		{
-			event = { .Quit = true };
-			eventType = EventType::QUIT;
-
-			break;
-		}
-		case SDL_WINDOWEVENT:
-		{
-			const SDL_WindowEvent& windowEvent = m_Event->window;
-			const uint8_t windowEventID = static_cast<uint8_t>(windowEvent.event); // cast isn't needed since SDL's Uint8 is uint8_t
-
-			if (windowEventID == SDL_WINDOWEVENT_RESIZED)
-			{
-				event = { .Width = static_cast<uint32_t>(windowEvent.data1), .Height = static_cast<uint32_t>(windowEvent.data2) };
-				eventType = EventType::RESIZED;
-			}
-			else if (windowEventID == SDL_WINDOWEVENT_MINIMIZED)
-			{
-				event = { .IsMinimized = true };
-				eventType = EventType::MININIZED;
-
-				// To reduce CPU usage while minimized
-				// Doesn't work as expected
-				//while (SDL_WaitEvent(m_Event))
-				//{
-				//	if (windowEventID == SDL_WINDOWEVENT_RESTORED)
-				//	{
-				//		//event = { .IsMinimized = false };
-				//		//eventType = EventType::RESTORED;
-				//		break;
-				//	}
-				//}
-			}
-			else if (windowEventID == SDL_WINDOWEVENT_RESTORED)
-			{
-				event = { .IsMinimized = false };
-				eventType = EventType::RESTORED;
-			}
-
-			break;
-		}
-		default:
-			break;
-		}
-
-		if (m_Callbacks.contains(eventType))
-			m_Callbacks.at(eventType)(event);
-	}
-}
+static bool s_Initialized = false;
 
 Window::Window(const WindowDescription& desc)
-	: m_Description(desc)
 {
-	if (!s_SDLInitialized)
+	m_Data.Description = desc;
+
+	if (!s_Initialized)
 	{
-		int success = SDL_Init(SDL_INIT_VIDEO);
-		ASSERT(!success, "Couldn't init SDL!");
-		s_SDLInitialized = true;
+		int success = glfwInit();
+		ASSERT(GLFW_TRUE == success, "Couldn't init GLFW");
+		s_Initialized = true;
 	}
 
-	auto flags = (SDL_WindowFlags)(SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-	if (desc.Maximized)
-		flags = (SDL_WindowFlags)(flags | SDL_WINDOW_MAXIMIZED);
+	m_Window = glfwCreateWindow(desc.Width, desc.Height, desc.Title.data(), nullptr, nullptr);
+	ASSERT(m_Window);
 
-	m_Window = SDL_CreateWindow(desc.Title.data(), SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, desc.Width, desc.Height, flags | SDL_WINDOW_VULKAN);
-	ASSERT(m_Window, "Unable to create a window. SDL error: %s", SDL_GetError());
+	glfwSetWindowUserPointer(m_Window, &m_Data);
+
+	SetupCallbacks();
 }
 
 Window::~Window()
 {
-	SDL_DestroyWindow(m_Window);
+	glfwDestroyWindow(m_Window);
 	m_Window = nullptr;
 
-	SDL_Quit();
+	glfwTerminate();
 }
 
 Scope<Window> Window::Create(const WindowDescription& props)
@@ -131,37 +48,42 @@ Scope<Window> Window::Create(const WindowDescription& props)
 
 void Window::OnUpdate()
 {
-	m_EventHandler.Poll();
+	glfwPollEvents();
 }
 
 const std::string_view Window::GetTitle() const
 {
-	return m_Description.Title;
+	return m_Data.Description.Title;
 }
 
 void Window::SetWidth(uint32_t width)
 {
-	m_Description.Width = width;
+	m_Data.Description.Width = width;
 }
 
 uint32_t Window::GetWidth() const
 {
-	return m_Description.Width;
+	return m_Data.Description.Width;
 }
 
 void Window::SetHeight(uint32_t height)
 {
-	m_Description.Height = height;
+	m_Data.Description.Height = height;
 }
 
 uint32_t Window::GetHeight() const
 {
-	return m_Description.Height;
+	return m_Data.Description.Height;
+}
+
+std::pair<uint32_t, uint32_t> Window::GetSize() const
+{
+	return { m_Data.Description.Width, m_Data.Description.Height };
 }
 
 void Window::OnResize(uint32_t width, uint32_t height)
 {
-	if (m_Description.Width == width && m_Description.Height == height)
+	if (m_Data.Description.Width == width && m_Data.Description.Height == height)
 		return;
 
 	SetWidth(width);
@@ -170,21 +92,118 @@ void Window::OnResize(uint32_t width, uint32_t height)
 
 void Window::EnableVSync(bool enable)
 {
-	m_Description.VSync = enable;
+	m_Data.Description.VSync = enable;
 }
 
 bool Window::HasVSync() const
 {
-	return m_Description.VSync;
+	return m_Data.Description.VSync;
 }
 
-void Window::RegisterCallback(EventType type, Window::EventHandler::EventCallbackFn&& cb)
+void Window::SetEventCallback(const std::function<void(Event&)>& cb)
 {
-	m_EventHandler.Register(type, std::move(cb));
+	m_Data.EventCallback = cb;
+}
+
+void Window::SetupCallbacks()
+{
+	glfwSetWindowSizeCallback(m_Window, [](GLFWwindow* window, int width, int height)
+		{
+			WindowData& data = *static_cast<WindowData*>((glfwGetWindowUserPointer(window)));
+			WindowDescription& desc = data.Description;
+
+			int w = 0, h = 0;
+			glfwGetFramebufferSize(window, &w, &h);
+
+			ASSERT(width == w);
+			ASSERT(height == h);
+
+			desc.Width = static_cast<uint32_t>(width);
+			desc.Height = static_cast<uint32_t>(height);
+
+			ResizeEvent event;
+
+			event.Width = desc.Width;
+			event.Height = desc.Height;
+
+			data.EventCallback(event);
+		});
+
+	glfwSetWindowCloseCallback(m_Window, [](GLFWwindow* window)
+		{
+			WindowData& data = *static_cast<WindowData*>((glfwGetWindowUserPointer(window)));
+
+			QuitEvent event;
+
+			data.EventCallback(event);
+		});
+
+	glfwSetKeyCallback(m_Window, [](GLFWwindow* window, int key, int scancode, int action, int mods)
+		{
+			WindowData& data = *static_cast<WindowData*>((glfwGetWindowUserPointer(window)));
+
+			KeyPressedEvent event;
+
+			switch (action)
+			{
+			case GLFW_PRESS:
+			{
+				event.Keycode = (KeyCode)key;
+				event.RepeatCount = 0;
+
+				break;
+			}
+			case GLFW_RELEASE:
+			{
+				break;
+			}
+			case GLFW_REPEAT:
+			{
+				event.Keycode = (KeyCode)key;
+				event.RepeatCount = 1;
+
+				break;
+			}
+			}
+
+			data.EventCallback(event);
+		});
+
+	glfwSetMouseButtonCallback(m_Window, [](GLFWwindow* window, int button, int action, int mods)
+		{
+			WindowData& data = *static_cast<WindowData*>((glfwGetWindowUserPointer(window)));
+
+			MouseButtonPressedEvent event;
+
+			switch (action)
+			{
+			case GLFW_PRESS:
+			case GLFW_RELEASE:
+			{
+				event.Button = (MouseButton)button;
+
+				break;
+			}
+			}
+
+			data.EventCallback(event);
+		});
+
+	glfwSetScrollCallback(m_Window, [](GLFWwindow* window, double xOffset, double yOffset)
+		{
+			WindowData& data = *static_cast<WindowData*>((glfwGetWindowUserPointer(window)));
+
+			MouseMotionEvent event;
+
+			event.Position = { static_cast<float>(xOffset), static_cast<float>(yOffset) };
+
+			data.EventCallback(event);
+		});
+
 }
 
 template<>
-SDL_Window* Window::GetHandle<SDL_Window>() const
+GLFWwindow* Window::GetHandle<GLFWwindow>() const
 {
 	return m_Window;
 }

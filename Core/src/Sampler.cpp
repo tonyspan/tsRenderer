@@ -5,6 +5,7 @@
 
 #include "Log.h"
 
+#include <volk.h>
 #include <vulkan/vulkan.h>
 
 Ref<Sampler> Sampler::Create(const SamplerDescription& desc)

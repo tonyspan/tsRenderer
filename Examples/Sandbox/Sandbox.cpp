@@ -30,7 +30,7 @@ private:
 		const auto& [width, height] = Application::GetSize();
 		m_Camera = Camera(float(width) / float(height));
 
-		Shader::CompileShaders(GetProjectDirectory() + "/Shaders/");
+		ShaderCompiler::CompileWithValidator(GetProjectDirectory() + "/Shaders/");
 
 		DescriptorSetLayout dsl = {
 			{.Name = "UBO", .Binding = 0, .Type = DescriptorType::UNIFORM_BUFFER, .Stage = StageFlag::VERTEX },
@@ -53,10 +53,10 @@ private:
 			const auto xWingAssetName = s_AssetsNames[0];
 
 			m_Meshes[xWingAssetName] = Mesh::Create("Models/Xwing.obj");
-			m_Textures[xWingAssetName] = Texture2D::Create("Textures/XwingColors.png");
+			m_Textures[xWingAssetName] = Texture::Create("Textures/XwingColors.png");
 
-			m_UniformBuffers.insert({ xWingAssetName, Buffer::CreateUniform(sizeof(Sandbox::UBO)) });
-			m_UniformBuffers.insert({ xWingAssetName, Buffer::CreateUniform(sizeof(Sandbox::GUBO)) });
+			m_UniformBuffers.insert({ xWingAssetName, GBuffer::CreateUniform(sizeof(Sandbox::UBO)) });
+			m_UniformBuffers.insert({ xWingAssetName, GBuffer::CreateUniform(sizeof(Sandbox::GUBO)) });
 
 			m_DescriptorSets[xWingAssetName] = DescriptorSet::Create(dsl);
 
@@ -68,7 +68,7 @@ private:
 				binding += 2;
 			}
 
-			m_DescriptorSets[xWingAssetName]->SetTexture(1, static_cast<const Texture&>(*m_Textures[xWingAssetName]));
+			m_DescriptorSets[xWingAssetName]->SetTexture(1, *m_Textures[xWingAssetName]);
 
 			PipelineDescription desc;
 
@@ -90,10 +90,10 @@ private:
 
 			m_DescriptorSets[skyboxAssetName] = DescriptorSet::Create(dsl2);
 
-			const auto& skyboxUniform = m_UniformBuffers.insert({ skyboxAssetName, Buffer::CreateUniform(sizeof(Sandbox::UBO)) });
+			const auto& skyboxUniform = m_UniformBuffers.insert({ skyboxAssetName, GBuffer::CreateUniform(sizeof(Sandbox::UBO)) });
 
 			m_DescriptorSets[skyboxAssetName]->SetBuffer(0, *(skyboxUniform->second));
-			m_DescriptorSets[skyboxAssetName]->SetTexture(1, static_cast<const Texture&>(m_Skybox->GetTexture()));
+			m_DescriptorSets[skyboxAssetName]->SetTexture(1, m_Skybox->GetTexture());
 
 			PipelineDescription desc;
 
@@ -110,10 +110,10 @@ private:
 			const auto roomAssetName = s_AssetsNames[2];
 
 			m_Meshes[roomAssetName] = Mesh::Create("Models/VikingRoom.obj");
-			m_Textures[roomAssetName] = Texture2D::Create("Textures/VikingRoom.png");
+			m_Textures[roomAssetName] = Texture::Create("Textures/VikingRoom.png");
 
-			m_UniformBuffers.insert({ roomAssetName, Buffer::CreateUniform(sizeof(Sandbox::UBO)) });
-			m_UniformBuffers.insert({ roomAssetName, Buffer::CreateUniform(sizeof(Sandbox::GUBO)) });
+			m_UniformBuffers.insert({ roomAssetName, GBuffer::CreateUniform(sizeof(Sandbox::UBO)) });
+			m_UniformBuffers.insert({ roomAssetName, GBuffer::CreateUniform(sizeof(Sandbox::GUBO)) });
 
 			m_DescriptorSets[roomAssetName] = DescriptorSet::Create(dsl);
 
@@ -125,7 +125,7 @@ private:
 				binding += 2;
 			}
 
-			m_DescriptorSets[roomAssetName]->SetTexture(1, static_cast<const Texture&>(*m_Textures[roomAssetName]));
+			m_DescriptorSets[roomAssetName]->SetTexture(1, *m_Textures[roomAssetName]);
 
 			PipelineDescription desc;
 
@@ -146,14 +146,14 @@ private:
 			CreateTextMesh(demoText, textVertices, textIndices);
 
 			m_Meshes[textAssetName] = Mesh::Create(textVertices, textIndices);
-			m_Textures[textAssetName] = Texture2D::Create("Textures/Fonts.png");
+			m_Textures[textAssetName] = Texture::Create("Textures/Fonts.png");
 
-			const auto& textUniform = m_UniformBuffers.insert({ textAssetName, Buffer::CreateUniform(sizeof(Sandbox::UBO)) });
+			const auto& textUniform = m_UniformBuffers.insert({ textAssetName, GBuffer::CreateUniform(sizeof(Sandbox::UBO)) });
 
 			m_DescriptorSets[textAssetName] = DescriptorSet::Create(dsl2);
 
 			m_DescriptorSets[textAssetName]->SetBuffer(0, *(textUniform->second));
-			m_DescriptorSets[textAssetName]->SetTexture(1, static_cast<const Texture&>(*m_Textures[textAssetName]));
+			m_DescriptorSets[textAssetName]->SetTexture(1, *m_Textures[textAssetName]);
 
 			PipelineDescription desc;
 
@@ -162,7 +162,7 @@ private:
 			desc.ShaderModules = { { StageFlag::VERTEX, "Shaders/Text.vert.spv" }, { StageFlag::FRAGMENT, "Shaders/Text.frag.spv" } };
 			desc.CompareOp = CompareOp::LESS_OR_EQUAL;
 			desc.CullMode = CullMode::NONE;
-			desc.TransparencyEnabled = true;
+			desc.EnableTransparency = true;
 
 			m_Pipelines[textAssetName] = Pipeline::Create(desc);
 		}
@@ -272,7 +272,7 @@ private:
 			auto range = m_UniformBuffers.equal_range(xWingAssetName);
 			for (auto it = range.first; it != range.second; it++)
 			{
-				Ref<Buffer> buffer = it->second;
+				Ref<GBuffer> buffer = it->second;
 				(binding == 0) ? buffer->SetData(&ubo) : buffer->SetData(&gubo);
 
 				binding += 2;
@@ -309,7 +309,7 @@ private:
 			auto range = m_UniformBuffers.equal_range(roomAssetName);
 			for (auto it = range.first; it != range.second; it++)
 			{
-				Ref<Buffer> buffer = it->second;
+				Ref<GBuffer> buffer = it->second;
 				(0 == binding) ? buffer->SetData(&ubo) : buffer->SetData(&gubo);
 
 				binding += 2;
@@ -328,7 +328,7 @@ private:
 	std::unordered_map<std::string, Ref<Texture>> m_Textures;
 	std::unordered_map<std::string, Ref<Pipeline>> m_Pipelines;
 	std::unordered_map<std::string, Ref<Mesh>> m_Meshes;
-	std::unordered_multimap<std::string, Ref<Buffer>> m_UniformBuffers;
+	std::unordered_multimap<std::string, Ref<GBuffer>> m_UniformBuffers;
 };
 
 int main(int argc, char** argv)

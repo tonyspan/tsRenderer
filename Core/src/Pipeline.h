@@ -7,13 +7,13 @@
 #include "Enums.h"
 
 #include <map>
-#include <string>
+#include <filesystem>
 
 class Layout;
 
 struct PipelineDescription
 {
-	std::map<StageFlag, std::string> ShaderModules;
+	std::map<StageFlag, std::filesystem::path> ShaderModules;
 	VkDescriptorSetLayout DescSetLayout = nullptr;
 	const Layout* BufferLayout = nullptr;
 
@@ -21,7 +21,7 @@ struct PipelineDescription
 	PolygonMode PolygonMode = PolygonMode::FILL;
 	CullMode CullMode = CullMode::BACK;
 	PrimitiveTopology Topology = PrimitiveTopology::TRIANGLE_LIST;
-	bool TransparencyEnabled = false;
+	bool EnableTransparency = false;
 };
 
 class Pipeline : public Handle<VkPipeline, VkPipelineLayout>

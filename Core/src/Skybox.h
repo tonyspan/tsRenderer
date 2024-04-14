@@ -6,7 +6,7 @@
 #include <string_view>
 
 class Mesh;
-class TextureCube;
+class Texture;
 
 class Skybox
 {
@@ -19,8 +19,8 @@ public:
 	~Skybox();
 
 	const Mesh& GetMesh() const;
-	const TextureCube& GetTexture() const;
+	const Texture& GetTexture() const;
 private:
 	Ref<Mesh> m_Mesh;
-	Ref<TextureCube> m_Texture;
+	Ref<Texture> m_Texture;
 };

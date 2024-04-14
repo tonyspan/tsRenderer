@@ -7,6 +7,7 @@
 
 #include "Log.h"
 
+#include <volk.h>
 #include <vulkan/vulkan.h>
 
 #include <vector>
@@ -14,6 +15,8 @@
 #include <string>
 
 extern std::vector<const char*> g_ValidationLayers;
+
+static constexpr const char* s_LogTag = "[Device]";
 
 static const std::vector<const char*> s_DeviceExtensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
@@ -52,10 +55,12 @@ static QueueFamilyIndices FindQueueFamilies(const VkPhysicalDevice device, const
 static bool CheckDeviceExtensionSupport(VkPhysicalDevice device)
 {
 	uint32_t count;
-	vkEnumerateDeviceExtensionProperties(device, nullptr, &count, nullptr);
+	VkResult result = vkEnumerateDeviceExtensionProperties(device, nullptr, &count, nullptr);
+	VK_CHECK_RESULT(result);
 
 	std::vector<VkExtensionProperties> availableExtensions(count);
-	vkEnumerateDeviceExtensionProperties(device, nullptr, &count, availableExtensions.data());
+	result = vkEnumerateDeviceExtensionProperties(device, nullptr, &count, availableExtensions.data());
+	VK_CHECK_RESULT(result);
 
 	std::set<std::string> requiredExtensions(s_DeviceExtensions.begin(), s_DeviceExtensions.end());
 
@@ -119,6 +124,8 @@ PhysicalDevice::~PhysicalDevice()
 
 void PhysicalDevice::Select(const Surface& surface)
 {
+	ASSERT(surface.GetHandle());
+
 	uint32_t count = 0;
 	vkEnumeratePhysicalDevices(m_Instance.GetHandle(), &count, nullptr);
 	ASSERT(count != 0, "Failed to find GPUs with Vulkan support");
@@ -126,7 +133,7 @@ void PhysicalDevice::Select(const Surface& surface)
 	std::vector<VkPhysicalDevice> physicalDevices(count);
 	vkEnumeratePhysicalDevices(m_Instance.GetHandle(), &count, physicalDevices.data());
 
-	LOG("Physical devices found: %i", count);
+	LOG_TAGGED(s_LogTag, "Physical devices found: %i", count);
 
 	for (const auto& device : physicalDevices)
 	{
@@ -145,7 +152,7 @@ void PhysicalDevice::Select(const Surface& surface)
 	ASSERT(Handle::GetHandle(), "Failed to find a suitable GPU");
 	ASSERT(m_QueueFamilyIndices.IsComplete());
 
-	LOG("Selected GPU: %s", m_Properties->deviceName);
+	LOG_TAGGED(s_LogTag, "Selected GPU: %s", QUOTED(m_Properties->deviceName));
 }
 
 const VkPhysicalDeviceProperties& PhysicalDevice::GetProperties() const

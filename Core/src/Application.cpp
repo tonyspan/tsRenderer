@@ -7,11 +7,15 @@
 #include "CommandBuffer.h"
 #include "Shader.h"
 
+#include "Event.h"
+
+#include "Input.h"
+
 #include "Timer.h"
 #include "Log.h"
 #include "Profiler.h"
 
-#include "Gui.h"
+#include "IMGUII.h"
 #include <imgui.h>
 
 void Application::Run()
@@ -21,14 +25,13 @@ void Application::Run()
 	desc.VSync = true;
 	m_Window = Window::Create(desc);
 
-	m_Window->RegisterCallback(EventType::QUIT, BIND_FUNC(OnClose));
-	m_Window->RegisterCallback(EventType::RESIZED, BIND_FUNC(OnResize));
-	m_Window->RegisterCallback(EventType::MININIZED, BIND_FUNC(OnMinimize));
-	m_Window->RegisterCallback(EventType::RESTORED, BIND_FUNC(OnMinimize));
+	m_Window->SetEventCallback(BIND_FUNC(AppEvent));
+
+	Input::SetWindow(*m_Window);
 
 	Context::Init(*m_Window);
 
-	m_ImGui = Gui::Create(*m_Window);
+	m_ImGui = IMGUI::Create(*m_Window);
 
 	auto& swapchain = Context::GetSwapchain();
 
@@ -58,8 +61,8 @@ void Application::Run()
 			{
 				ImGui::Text("FPS: %0.1f | Delta Time: %0.2f ms", 1.0f / dt, dtMS);
 
-				for (const auto& [name, timeData] : PerFramePerfProfiler::GetPerFrameData())
-					ImGui::Text("%s Time: %.2f ms", name.data(), timeData.Time);
+				for (const auto& [name, frameData] : PerFramePerfProfiler::GetPerFrameData())
+					ImGui::Text("%s Time: %.2f ms", name.data(), frameData.Time);
 			}
 			ImGui::End();
 
@@ -83,23 +86,44 @@ void Application::Run()
 std::pair<uint32_t, uint32_t> Application::GetSize() const
 {
 	const auto& desc = Context::GetSwapchain().GetDescription();
+	const auto& [windowWidth, windowHeight] = m_Window->GetSize();
+
+	ASSERT(desc.Width == windowWidth && desc.Height == windowHeight);
+
 	return { desc.Width, desc.Height };
 }
 
-void Application::OnClose(Event& event)
+void Application::AppEvent(Event& event)
 {
-	m_ShouldClose = true;
+	EventDispatcher dispatcher(event);
+
+	dispatcher.Dispatch<QuitEvent>([&shouldClode = m_ShouldClose](QuitEvent& event)
+		{
+			shouldClode = true;
+		});
+
+	dispatcher.Dispatch<ResizeEvent>(BIND_FUNC(OnResize));
+
+	OnEvent(event);
 }
 
 // For the current architecture works, but ...
 // NOTE: Almost the whole app is destroyed and restarted to work which is far from optimal
 // TODO: Fix somehow
-void Application::OnResize(Event& event)
+void Application::OnResize(ResizeEvent& event)
 {
-	uint32_t width = event.Width;
-	uint32_t height = event.Height;
+	const uint32_t width = event.Width;
+	const uint32_t height = event.Height;
 
 	Context::GetDevice().WaitIdle();
+
+	if (0 == width || 0 == height)
+	{
+		m_Minimized = true;
+		return;
+	}
+
+	m_Minimized = false;
 
 	OnShutdown();
 
@@ -108,10 +132,5 @@ void Application::OnResize(Event& event)
 
 	OnInit();
 
-	//Context::GetDevice().WaitIdle();
-}
-
-void Application::OnMinimize(Event& event)
-{
-	m_Minimized = event.IsMinimized;
+	Context::GetDevice().WaitIdle();
 }

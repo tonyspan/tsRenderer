@@ -3,8 +3,7 @@
 #include "Base.h"
 
 #include "Log.h"
-
-#include <vulkan/vulkan.h>
+#include <volk.h>
 
 VkFormat Convert(Format format)
 {
@@ -48,6 +47,20 @@ uint32_t FormatBytesPerPixel(Format format)
 
 	ASSERT(false, "Unknown format type");
 	return 0;
+}
+
+Format FormatBytesPerPixel(uint32_t channels)
+{
+	switch (channels)
+	{
+	case 4:
+		return Format::RGBA_8_SRGB;
+	default:
+		break;
+	}
+
+	ASSERT(false, "Unknown format type");
+	return Format::UNDEFINED;
 }
 
 VkSampleCountFlagBits Convert(uint8_t msaaNumSamples)

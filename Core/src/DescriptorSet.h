@@ -48,7 +48,7 @@ private:
 };
 
 class Texture;
-class Buffer;
+class GBuffer;
 
 class DescriptorSet
 {
@@ -59,7 +59,7 @@ public:
 
 	~DescriptorSet();
 
-	void SetBuffer(uint32_t binding, const Buffer& buffer);
+	void SetBuffer(uint32_t binding, const GBuffer& buffer);
 	void SetTexture(uint32_t binding, const Texture& texture);
 
 	const VkDescriptorSetLayout GetLayout() const;

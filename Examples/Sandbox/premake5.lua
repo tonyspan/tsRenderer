@@ -1,4 +1,4 @@
-project "Cube"
+project "Sandbox"
 	kind "ConsoleApp"
 
 	targetdir ("%{wks.location}/bin/" .. outputdir .. "/%{prj.name}")
@@ -14,27 +14,14 @@ project "Cube"
 	{
 		"%{wks.location}/Core/src",
 		"%{IncludeDir.glm}",
-		"%{IncludeDir.SDL}",
 		"%{IncludeDir.stb}",
 		"%{IncludeDir.tinyobj}",
-		"%{IncludeDir.Vulkan}"
-	}
-
-	libdirs
-	{
-		"%{LibDir.Vulkan}"
+		--"%{IncludeDir.Vulkan}"
 	}
 
 	links
 	{
 		"Core",
-		
-		"vulkan-1"
-	}
-
-	postbuildcommands
-	{
-		"{COPY} %{LibDir.SDL}/**.dll %{cfg.targetdir}"
 	}
 
 	filter "system:windows"

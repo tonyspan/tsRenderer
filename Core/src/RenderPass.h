@@ -27,6 +27,10 @@ public:
 
 	void Begin(const CommandBuffer& commandBuffer, const Framebuffer& framebuffer);
 	void End(const CommandBuffer& commandBuffer);
+
+	const RenderPassDescription& GetDescription() const;
 private:
-	void CreateRenderPass(const RenderPassDescription& desc);
+	void CreateRenderPass();
+private:
+	RenderPassDescription m_Description;
 };

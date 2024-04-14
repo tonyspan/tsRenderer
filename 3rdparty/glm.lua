@@ -14,7 +14,6 @@ project "glm"
 
     includedirs
     {
-        "{%IncludeDir.glm}"
     }
 
 	filter "system:windows"

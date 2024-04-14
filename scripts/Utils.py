@@ -18,10 +18,13 @@ def Download(url, path):
             size = file.write(data)
             bar.update(size)
 
-def Unzip(path, location):
+def Unzip(path, location, removeZip = True):
     with zipfile.ZipFile(path, 'r') as zip_ref:
         for file_info in zip_ref.infolist():
             zip_ref.extract(file_info, location)
+
+    if(removeZip):
+        os.remove(path)
 
 def NormalizeAndGetAbsolutePath(path):
     path = os.path.abspath(path)

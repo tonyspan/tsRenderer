@@ -2,12 +2,13 @@
 
 #include "Context.h"
 #include "Device.h"
-#include "Buffer.h"
+#include "GBuffer.h"
 #include "DescriptorSet.h"
 #include "Pipeline.h"
 
 #include "Log.h"
 
+#include <volk.h>
 #include <vulkan/vulkan.h>
 
 #include <array>
@@ -85,14 +86,17 @@ void CommandBuffer::BindDescriptorSet(const DescriptorSet& set)
 	vkCmdBindDescriptorSets(Handle::GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, m_BoundPipeline->GetHandle<VkPipelineLayout>(), 0, 1, &vkSet, 0, nullptr);
 }
 
-void CommandBuffer::BindVertexBuffer(const Buffer& buffer)
+void CommandBuffer::BindVertexBuffer(const GBuffer& buffer)
 {
-	std::array vertexBuffers = { buffer.GetHandle<VkBuffer>() };
+	auto& bufferHandle = buffer.GetHandle<VkBuffer>();
+	ASSERT(bufferHandle);
+
+	std::array vertexBuffers = { bufferHandle };
 	VkDeviceSize offsets = 0;
 	vkCmdBindVertexBuffers(Handle::GetHandle(), 0, static_cast<uint32_t>(vertexBuffers.size()), vertexBuffers.data(), &offsets);
 }
 
-void CommandBuffer::BindIndexBuffer(const Buffer& buffer)
+void CommandBuffer::BindIndexBuffer(const GBuffer& buffer)
 {
 	vkCmdBindIndexBuffer(Handle::GetHandle(), buffer.GetHandle<VkBuffer>(), 0, VK_INDEX_TYPE_UINT32);
 }
@@ -107,9 +111,9 @@ void CommandBuffer::BindPipeline(const Pipeline& pipeline)
 	vkCmdBindPipeline(Handle::GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipeline);
 }
 
-void CommandBuffer::Draw(uint32_t vertexCount)
+void CommandBuffer::Draw(uint32_t vertexCount, uint32_t firstIndex)
 {
-	vkCmdDraw(Handle::GetHandle(), vertexCount, 1, 0, 0);
+	vkCmdDraw(Handle::GetHandle(), vertexCount, 1, firstIndex, 0);
 }
 
 void CommandBuffer::DrawIndexed(uint32_t indexCount, uint32_t firstIndex)

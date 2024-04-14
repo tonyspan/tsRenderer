@@ -1,5 +1,5 @@
-project "tinyobjloader"
-    location "tinyobjloader"
+project "Vulkan-Utility-Libraries"
+    location "Vulkan-Utility-Libraries"
     kind "None"
     language "C++"
 
@@ -8,8 +8,9 @@ project "tinyobjloader"
 
     files
     {
-        "tinyobjloader/**.hpp",
-        "tinyobjloader/**.h"
+        "Vulkan-Utility-Libraries/**.cpp",
+        "Vulkan-Utility-Libraries/include/**.h",
+        "Vulkan-Utility-Libraries/include/**.hpp",
     }
 
     includedirs

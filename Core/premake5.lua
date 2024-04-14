@@ -11,37 +11,82 @@ project "Core"
 
 		"%{IncludeDir.glm}" .. "**.hpp",
 		"%{IncludeDir.glm}" .. "**.inl",
+		"%{IncludeDir.volk}" .. "**.h"
 	}
 
 	includedirs
 	{
 		"src",
 		
-		"%{IncludeDir.SDL}",
+		"%{IncludeDir.glfw}",
 		"%{IncludeDir.glm}",
 		"%{IncludeDir.stb}",
 		"%{IncludeDir.tinyobj}",
 		"%{IncludeDir.ImGui}",
 		"%{IncludeDir.ImGui}/backends",
-		"%{IncludeDir.Vulkan}"
+
+		"%{IncludeDir.volk}",
+		"%{IncludeDir.Vulkan_Headers}",
+		"%{IncludeDir.Vulkan_Utility_Libraries}",
+		"%{IncludeDir.SPIRV_Reflect}",
+		"%{IncludeDir.glslang}",
 	}
 
 	libdirs
 	{
-		"%{LibDir.SDL}",
-		"%{LibDir.Vulkan}"
+		"%{LibDir.glslang}"
 	}
 
 	links
 	{
-		"SDL2",
-		"SDL2main",
-		"SDL2test",
+		"glfw",
 
 		"ImGui",
 
-		"vulkan-1"
+		"Vulkan-Utility-Libraries",
+		"SPIRV-Reflect",
 	}
+
+	defines
+	{
+		"GLSLANG_VALIDATOR_EXECUTABLE_RELATIVE_PATH=" .."\"" .. "%{BinDir.glslang}" .. "\""
+	}
+
+	filter "configurations:Debug"
+		runtime "Debug"
+		symbols "on"
+
+		links
+		{
+			-- glslang
+			"glslangd",
+			"GenericCodeGend",
+			"glslang-default-resource-limitsd",
+			"MachineIndependentd",
+			"OSDependentd",
+			"SPIRVd",
+			"SPIRV-Toolsd",
+			"SPIRV-Tools-optd",
+			"SPVRemapperd",
+		}
+
+	filter "configurations:Release"
+		runtime "Release"
+		optimize "on"
+
+		links
+		{
+			-- glslang
+			"glslang",
+			"GenericCodeGen",
+			"glslang-default-resource-limits",
+			"MachineIndependent",
+			"OSDependent",
+			"SPIRV",
+			"SPIRV-Tools",
+			"SPIRV-Tools-opt",
+			"SPVRemapper",
+		}
 
 	filter "system:windows"
 		systemversion "latest"

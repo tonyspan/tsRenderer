@@ -12,6 +12,7 @@
 
 #include "Log.h"
 
+#include <volk.h>
 #include <vulkan/vulkan.h>
 
 #include <array>
@@ -38,7 +39,7 @@ void Pipeline::CreatePipeline(const PipelineDescription& desc)
 {
 	const auto& vkDevice = Context::GetDevice().GetHandle();
 	const auto& swapchain = Context::GetSwapchain();
-	const auto& msaaSamples = swapchain.GetCurrentFramebuffer().GetDescription().MSAAnumSamples;
+	const auto& msaaSamples = swapchain.GetRenderPass()->GetDescription().MSAAnumSamples;
 	const auto& swapchainDesc = swapchain.GetDescription();
 	const auto& renderPass = Context::GetSwapchain().GetRenderPass();
 
@@ -133,7 +134,7 @@ void Pipeline::CreatePipeline(const PipelineDescription& desc)
 	multisampling.minSampleShading = 0.2f;
 	multisampling.rasterizationSamples = msaaSamples > 1 ? Convert(msaaSamples.value()) : VK_SAMPLE_COUNT_1_BIT;
 
-	const bool isTransparencyEnabled = desc.TransparencyEnabled;
+	const bool isTransparencyEnabled = desc.EnableTransparency;
 
 	VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
 

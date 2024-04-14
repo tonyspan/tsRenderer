@@ -8,6 +8,7 @@
 #include "RenderPass.h"
 #include "Swapchain.h"
 
+#include <volk.h>
 #include <vulkan/vulkan.h>
 
 #include <array>
@@ -39,7 +40,6 @@ void Framebuffer::CreateFramebuffer()
 
 	ASSERT(renderPass, "RenderPass must be valid");
 	ASSERT(m_Description.Width != 0 && m_Description.Height != 0, STR(m_Description.Width, m_Description.Height) " aren't set properly");
-	ASSERT(m_Description.MSAAnumSamples.has_value());
 
 	const auto& descAttachments = m_Description.Attachments;
 

@@ -1,4 +1,4 @@
-project "Triangle"
+project "Cube"
 	kind "ConsoleApp"
 
 	targetdir ("%{wks.location}/bin/" .. outputdir .. "/%{prj.name}")
@@ -14,27 +14,13 @@ project "Triangle"
 	{
 		"%{wks.location}/Core/src",
 		"%{IncludeDir.glm}",
-		"%{IncludeDir.SDL}",
 		"%{IncludeDir.stb}",
 		"%{IncludeDir.tinyobj}",
-		"%{IncludeDir.Vulkan}"
-	}
-
-	libdirs
-	{
-		"%{LibDir.Vulkan}"
 	}
 
 	links
 	{
 		"Core",
-		
-		"vulkan-1"
-	}
-
-	postbuildcommands
-	{
-		"{COPY} %{LibDir.SDL}/**.dll %{cfg.targetdir}"
 	}
 
 	filter "system:windows"

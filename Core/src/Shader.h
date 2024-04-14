@@ -6,22 +6,21 @@
 
 #include "Enums.h"
 
-#include <string_view>
-#include <vector>
+#include <filesystem>
+
+class Buffer;
 
 class Shader : public Handle<VkShaderModule>
 {
 public:
-	static Ref<Shader> Create(StageFlag stage, const std::string_view path);
+	static Ref<Shader> Create(StageFlag stage, const std::filesystem::path& path);
 
-	Shader(StageFlag stage, const std::string_view path, const std::vector<uint8_t>& code);
+	Shader(StageFlag stage, const std::filesystem::path& path, const Buffer& buffer);
 	~Shader();
 
 	const VkPipelineShaderStageCreateInfo& GetCreateInfoForPipeline() const;
-
-	static void CompileShaders(const std::string& shaderDirectory);
 private:
-	void CreateShaderModule(StageFlag stage, const std::string_view path, const std::vector<uint8_t>& code);
+	void CreateShaderModule(StageFlag stage, const std::filesystem::path& path, const Buffer& buffer);
 	void PopulatePipelineShaderStageCreateInfo(StageFlag stage);
 private:
 	VkPipelineShaderStageCreateInfo* m_PipelineShaderStageCreateInfo = nullptr;

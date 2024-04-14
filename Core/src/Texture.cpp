@@ -4,6 +4,7 @@
 #include "Device.h"
 #include "Image.h"
 #include "Buffer.h"
+#include "GBuffer.h"
 #include "Sampler.h"
 
 #include "Log.h"
@@ -33,23 +34,24 @@ static uint8_t* LoadFromFile(const std::string_view filename, uint32_t& width, u
 }
 
 template<typename T>
-static Ref<T> TryCreate(const std::span<const std::string_view> paths, TextureDescription& desc)
+static Ref<T> TryCreate(const std::span<const std::string_view> paths)
 {
 	if (paths.empty())
 		return nullptr;
 
-	uint8_t** data = new uint8_t * [paths.size()]();
+	const uint32_t imageCount = static_cast<uint32_t>(paths.size());
 
-	uint32_t channels;
+	uint32_t width = 0, height = 0, channels = 0;
 	int32_t curWidth = -1, curHeight = -1, curChannels = -1;
 
-	uint32_t& width = desc.Width;
-	uint32_t& height = desc.Height;
-	for (size_t i = 0; i < paths.size(); i++)
+	for (uint32_t i = 0; i < imageCount; i++)
 	{
 		const auto& path = paths[i];
 
-		data[i] = LoadFromFile(path, width, height, channels);
+		// Don't care about the actual image just yet, only for the image metadata
+		uint8_t* data = LoadFromFile(path, width, height, channels);
+
+		stbi_image_free(data);
 
 		if (i == 0)
 		{
@@ -61,39 +63,101 @@ static Ref<T> TryCreate(const std::span<const std::string_view> paths, TextureDe
 		{
 			ASSERT(!((curWidth != width) || (curHeight != height) || (curChannels != channels)), "All images must have the same size");
 		}
-
-		LOG("Loaded %s, size: (%ix%i), channels: %i", path.data(), width, height, channels);
 	}
 
-	auto imageFreeFunc = [&data, imageCount = paths.size()]()
-		{
-			for (uint32_t i = 0; i < imageCount; i++)
-			{
-				stbi_image_free(data[i]);
-				data[i] = nullptr;
-			}
+	ASSERT((width != 0) || (height != 0) || (channels != 0));
 
-			delete[] data;
-			data = nullptr;
-		};
+	// R8G8B8 isn't supported by Vulkan?
+	if (3 == channels)
+		channels = 4;
 
-	if (data)
+	TextureDescription desc;
+
+	desc.Width = width;
+	desc.Height = height;
+	desc.ImageCount = imageCount;
+	desc.Format = FormatBytesPerPixel(channels);
+
+	const uint64_t imageSize = width * height * channels;
+	const uint64_t totalImagesSize = imageSize * imageCount;
+
+	Buffer buffer;
+	buffer.Allocate(totalImagesSize);
+
+	for (uint32_t i = 0; i < imageCount; i++)
 	{
-		Ref<T> texture = CreateRef<T>((void**)data, desc);
+		const auto& path = paths[i];
 
-		imageFreeFunc();
+		uint8_t* data = LoadFromFile(path, width, height, channels);
 
-		return texture;
+		if (data)
+		{
+			buffer.Write(data, imageSize, imageSize * i);
+
+			stbi_image_free(data);
+
+			LOG("Loaded %s, size: (%ix%i), channels: %i", path.data(), width, height, channels);
+		}
 	}
 
-	imageFreeFunc();
+	Ref<T> texture = T::Create(desc, buffer);
 
-	return nullptr;
+	buffer.Release();
+
+	return texture;
+}
+
+Ref<Texture> Texture::Create(const std::string_view path)
+{
+	std::array<std::string_view, 1> paths = { path };
+
+	return TryCreate<Texture2D>(paths);
+}
+
+Ref<Texture> Texture::Create(const std::array<std::string_view, s_MaxImageCount>& paths)
+{
+	return TryCreate<TextureCube>(paths);
+}
+
+template<>
+Ref<Texture> Texture::White<TextureType::TEXTURE2D>()
+{
+	static constexpr uint32_t s_WhiteTextureData = 0xffffffff;
+
+	TextureDescription desc;
+
+	desc.Width = 1;
+	desc.Height = 1;
+	desc.ImageCount = 1;
+	desc.Format = Format::RGBA_8_SRGB;
+
+	return Texture2D::Create(desc, Buffer((void*)&s_WhiteTextureData, sizeof(uint32_t)));
+}
+
+template<>
+Ref<Texture> Texture::White<TextureType::CUBE>()
+{
+	static constexpr uint32_t s_WhiteTextureData[6] = { 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff };
+
+	TextureDescription desc;
+
+	desc.Width = 1;
+	desc.Height = 1;
+	desc.ImageCount = (uint32_t)std::size(s_WhiteTextureData);
+	desc.Format = Format::RGBA_8_SRGB;
+
+	return TextureCube::Create(desc, Buffer((void*)&s_WhiteTextureData, sizeof(s_WhiteTextureData)));
 }
 
 Texture::Texture(TextureType type, const TextureDescription& desc)
 	: m_Type(type), m_Description(desc)
 {
+}
+
+Texture::~Texture()
+{
+	m_Sampler.reset();
+	m_Image.reset();
 }
 
 TextureType Texture::GetType() const
@@ -103,12 +167,7 @@ TextureType Texture::GetType() const
 
 uint32_t Texture::GenerateMips()
 {
-	const uint32_t width = m_Description.Width;
-	const uint32_t height = m_Description.Height;
-
-	ASSERT(m_Description.Width != 0 && m_Description.Height != 0);
-
-	return static_cast<uint32_t>(glm::floor(std::log2(glm::max(width, height)))) + 1;
+	return static_cast<uint32_t>(glm::floor(std::log2(glm::max(m_Description.Width, m_Description.Height)))) + 1;
 }
 
 const TextureDescription& Texture::GetDescription() const
@@ -116,163 +175,63 @@ const TextureDescription& Texture::GetDescription() const
 	return m_Description;
 }
 
-Ref<Texture2D> Texture2D::Create(const std::string_view path)
+void Texture::CreateTexture(const Buffer& buffer)
 {
-	TextureDescription desc;
-	desc.Format = Format::RGBA_8_SRGB;
+	ASSERT(buffer);
 
-	std::array<std::string_view, 1> paths = { path };
-
-	return TryCreate<Texture2D>(paths, desc);
-}
-
-Texture2D::Texture2D(void** data, const TextureDescription& desc)
-	: Texture(TextureType::TEXTURE, desc)
-{
-	CreateTexture(data);
-	CreateSampler();
-}
-
-Texture2D::~Texture2D()
-{
-	m_Sampler.reset();
-	m_Image.reset();
-}
-
-const Image2D& Texture2D::GetImage() const
-{
-	return *m_Image;
-}
-
-const Sampler& Texture2D::GetSampler() const
-{
-	return *m_Sampler;
-}
-
-void Texture2D::CreateTexture(void** data)
-{
-	ASSERT(data && data[0]);
-
-	const auto& texDesc = Texture::GetDescription();
-	const uint32_t width = texDesc.Width;
-	const uint32_t height = texDesc.Height;
+	const uint32_t width = m_Description.Width;
+	const uint32_t height = m_Description.Height;
+	const uint32_t imageCount = m_Description.ImageCount;
 
 	ASSERT(width != 0 && height != 0);
+	ASSERT(imageCount > 0 && imageCount <= s_MaxImageCount);
 
-	static constexpr uint32_t s_ImageCount = 1;
+	const uint64_t imageSize = width * height * FormatBytesPerPixel(m_Description.Format);
+	const uint64_t totalImagesSize = imageSize * imageCount;
+	ASSERT(buffer.GetSize() == totalImagesSize);
 
-	VkDeviceSize imageSize = width * height * FormatBytesPerPixel(texDesc.Format);
-
-	Scope<Buffer> stagingBuffer = Buffer::CreateStaging(imageSize);
-	stagingBuffer->SetData(data[0]);
+	Scope<GBuffer> stagingBuffer = GBuffer::CreateStaging(buffer.GetSize());
 
 	ImageDescription desc;
 
 	desc.Width = width;
 	desc.Height = height;
-	desc.MipLevels = texDesc.GenerateMipLevels ? GenerateMips() : 1;
-	desc.ImageCount = s_ImageCount;
+	desc.MipLevels = m_Description.GenerateMipLevels ? GenerateMips() : 1;
+	desc.ImageCount = imageCount;
 	desc.MSAAnumSamples = 1;
-	desc.Format = texDesc.Format;
+	desc.Format = m_Description.Format;
 	desc.ImageUsage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-	desc.ImageCreateFlags = 0;
-	desc.ImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
-	desc.ViewType = VK_IMAGE_VIEW_TYPE_2D;
 	desc.Properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	desc.ImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
 
-	m_Image = Image2D::Create(desc);
-
-	m_Image->TransitionImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-	m_Image->CopyFrom(*stagingBuffer);
-}
-
-void Texture2D::CreateSampler()
-{
-	SamplerDescription desc;
-
-	desc.MipLevels = Texture::GetDescription().GenerateMipLevels ? GenerateMips() : 1;
-	desc.MagFilter = Filter::NEAREST;
-	desc.MinFilter = Filter::NEAREST;
-
-	m_Sampler = Sampler::Create(desc);
-}
-
-Ref<TextureCube> TextureCube::Create(const std::array<std::string_view, 6>& paths)
-{
-	TextureDescription desc;
-	desc.Format = Format::RGBA_8_SRGB;
-
-	return TryCreate<TextureCube>(paths, desc);
-}
-
-TextureCube::TextureCube(void** data, const TextureDescription& desc)
-	: Texture(TextureType::CUBE, desc)
-{
-	CreateCube(data);
-	CreateSampler();
-}
-
-TextureCube::~TextureCube()
-{
-	m_Sampler.reset();
-	m_Image.reset();
-}
-
-const Image2D& TextureCube::GetImage() const
-{
-	return *m_Image;
-}
-
-const Sampler& TextureCube::GetSampler() const
-{
-	return *m_Sampler;
-}
-
-void TextureCube::CreateCube(void** data)
-{
-	ASSERT(data);
-
-	const auto& texDesc = Texture::GetDescription();
-	const uint32_t width = texDesc.Width;
-	const uint32_t height = texDesc.Height;
-
-	ASSERT(width != 0 && height != 0);
-
-	static constexpr uint32_t s_ImageCount = 6;
-
-
-	VkDeviceSize imageSize = width * height * FormatBytesPerPixel(texDesc.Format);
-	VkDeviceSize totalImageSize = imageSize * s_ImageCount;
-
-	Scope<Buffer> stagingBuffer = Buffer::CreateStaging(totalImageSize);
-
-	for (uint32_t i = 0; i < s_ImageCount; i++)
+	if (s_MaxImageCount == imageCount)
 	{
-		if (data[i])
-			stagingBuffer->SetData(data[i], imageSize, imageSize * i);
+		desc.ImageCreateFlags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+		desc.ViewType = VK_IMAGE_VIEW_TYPE_CUBE;
+
+		// Technically the else case works for this one too
+		// Just a different approach
+		for (uint32_t i = 0; i < imageCount; i++)
+		{
+			const uint64_t offset = imageSize * i;
+			stagingBuffer->SetData(&buffer[offset], imageSize, offset);
+		}
+	}
+	else
+	{
+		desc.ImageCreateFlags = 0;
+		desc.ViewType = VK_IMAGE_VIEW_TYPE_2D;
+
+		stagingBuffer->SetData(buffer.As<uint8_t>());
 	}
 
-	ImageDescription desc;
-
-	desc.Width = width;
-	desc.Height = height;
-	desc.MipLevels = texDesc.GenerateMipLevels ? GenerateMips() : 1;
-	desc.ImageCount = s_ImageCount;
-	desc.MSAAnumSamples = 1;
-	desc.Format = texDesc.Format;
-	desc.ImageUsage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-	desc.ImageCreateFlags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
-	desc.ImageAspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
-	desc.ViewType = VK_IMAGE_VIEW_TYPE_CUBE;
-	desc.Properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-
 	m_Image = Image2D::Create(desc);
 
 	m_Image->TransitionImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 	m_Image->CopyFrom(*stagingBuffer);
 }
 
-void TextureCube::CreateSampler()
+void Texture::CreateSampler()
 {
 	SamplerDescription desc;
 
@@ -281,4 +240,44 @@ void TextureCube::CreateSampler()
 	desc.MinFilter = Filter::NEAREST;
 
 	m_Sampler = Sampler::Create(desc);
+}
+
+const Image2D& Texture::GetImage() const
+{
+	ASSERT(m_Image);
+
+	return *m_Image;
+}
+
+const Ref<Sampler> Texture::GetSampler() const
+{
+	return m_Sampler;
+}
+
+Ref<Texture2D> Texture2D::Create(const TextureDescription& desc, const Buffer& buffer)
+{
+	return CreateRef<Texture2D>(desc, buffer);
+}
+
+Texture2D::Texture2D(const TextureDescription& desc, const Buffer& buffer)
+	: Texture(TextureType::TEXTURE2D, desc)
+{
+	CreateTexture(buffer);
+
+	if (desc.CreateSampler)
+		CreateSampler();
+}
+
+Ref<TextureCube> TextureCube::Create(const TextureDescription& desc, const Buffer& buffer)
+{
+	return CreateRef<TextureCube>(desc, buffer);
+}
+
+TextureCube::TextureCube(const TextureDescription& desc, const Buffer& buffer)
+	: Texture(TextureType::CUBE, desc)
+{
+	CreateTexture(buffer);
+
+	if (desc.CreateSampler)
+		CreateSampler();
 }

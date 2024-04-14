@@ -11,3 +11,18 @@
 [submodule "3rdparty/tinyobjloader"]
 	path = 3rdparty/tinyobjloader
 	url = https://github.com/tinyobjloader/tinyobjloader.git
+[submodule "3rdparty/glfw"]
+	path = 3rdparty/glfw
+	url = https://github.com/glfw/glfw.git
+[submodule "3rdparty/volk"]
+	path = 3rdparty/volk
+	url = https://github.com/zeux/volk.git
+[submodule "3rdparty/Vulkan-Headers"]
+	path = 3rdparty/Vulkan-Headers
+	url = https://github.com/KhronosGroup/Vulkan-Headers.git
+[submodule "3rdparty/Vulkan-Utility-Libraries"]
+	path = 3rdparty/Vulkan-Utility-Libraries
+	url = https://github.com/KhronosGroup/Vulkan-Utility-Libraries.git
+[submodule "3rdparty/SPIRV-Reflect"]
+	path = 3rdparty/SPIRV-Reflect
+	url = https://github.com/KhronosGroup/SPIRV-Reflect.git

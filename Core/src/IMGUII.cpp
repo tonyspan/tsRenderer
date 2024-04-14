@@ -1,4 +1,4 @@
-#include "Gui.h"
+#include "IMGUII.h"
 
 #include "Context.h"
 #include "Instance.h"
@@ -13,13 +13,14 @@
 
 #include "Log.h"
 
+#include <volk.h>
+#include <vulkan/vulkan.h>
+
 #include <imgui.h>
-#include <backends/imgui_impl_sdl2.h>
+#include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_vulkan.h>
 
-#include <SDL.h>
-#include <SDL_vulkan.h>
-#include <vulkan/vulkan.h>
+#include <GLFW/glfw3.h>
 
 static VkDescriptorPool s_DescriptorPool = VK_NULL_HANDLE;
 
@@ -57,17 +58,17 @@ static VkDescriptorPool CreateDescriptorPool(VkDevice device)
 	return pool;
 }
 
-Ref<Gui> Gui::Create(const Window& window)
+Ref<IMGUI> IMGUI::Create(const Window& window)
 {
-	return CreateRef<Gui>(window);
+	return CreateRef<IMGUI>(window);
 }
 
-Gui::Gui(const Window& window)
+IMGUI::IMGUI(const Window& window)
 {
 	Init(window);
 }
 
-void Gui::Init(const Window& window)
+void IMGUI::Init(const Window& window)
 {
 	const auto& device = Context::GetDevice();
 	const auto& physicalDevice = device.GetPhysicalDevice();
@@ -83,11 +84,18 @@ void Gui::Init(const Window& window)
 	ImGuiIO& io = ImGui::GetIO();
 	io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
 
-	ImGui_ImplSDL2_InitForVulkan(window.GetHandle<SDL_Window>());
+	VkInstance instance = Context::GetInstance().GetHandle();
+
+	ImGui_ImplVulkan_LoadFunctions([](const char* funcName, void* vkInstance)
+		{
+			return vkGetInstanceProcAddr(volkGetLoadedInstance(), funcName);
+		}, &instance);
+
+	ImGui_ImplGlfw_InitForVulkan(window.GetHandle<GLFWwindow>(), true);
 
 	ImGui_ImplVulkan_InitInfo initInfo = {};
 
-	initInfo.Instance = Context::GetInstance().GetHandle();
+	initInfo.Instance = instance;
 	initInfo.PhysicalDevice = physicalDevice.GetHandle();
 	initInfo.Device = device.GetHandle();
 	initInfo.QueueFamily = physicalDevice.GetQueueFamilyIndices().GraphicsIndex.value();
@@ -99,7 +107,7 @@ void Gui::Init(const Window& window)
 	initInfo.ImageCount = swapchain.GetImageCount();
 
 	// TODO: Find a better way to deal with it
-	const auto& msaaSamples = swapchain.GetCurrentFramebuffer().GetDescription().MSAAnumSamples;
+	const auto& msaaSamples = swapchain.GetRenderPass()->GetDescription().MSAAnumSamples;
 
 	initInfo.MSAASamples = msaaSamples > 1 ? Convert(msaaSamples.value()) : VK_SAMPLE_COUNT_1_BIT;
 	initInfo.Allocator = nullptr;
@@ -120,25 +128,25 @@ void Gui::Init(const Window& window)
 	}
 }
 
-void Gui::Shutdown()
+void IMGUI::Shutdown()
 {
 	ImGui_ImplVulkan_Shutdown();
-	ImGui_ImplSDL2_Shutdown();
+	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
 
 	vkDestroyDescriptorPool(Context::GetDevice().GetHandle(), s_DescriptorPool, nullptr);
 }
 
-void Gui::Render(CommandBuffer& commandBuffer)
+void IMGUI::Render(CommandBuffer& commandBuffer)
 {
 	ImGui::Render();
 	ImDrawData* drawData = ImGui::GetDrawData();
 	ImGui_ImplVulkan_RenderDrawData(drawData, commandBuffer.GetHandle());
 }
 
-void Gui::NewFrame()
+void IMGUI::NewFrame()
 {
 	ImGui_ImplVulkan_NewFrame();
-	ImGui_ImplSDL2_NewFrame();
+	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
 }

@@ -1,2 +1,4 @@
+#!/bin/bash
+
 cd ..
-Engine/3rdparty/premake/bin/premake5 gmake2
+./scripts/premake/bin/premake5 gmake2

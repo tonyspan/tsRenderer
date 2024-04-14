@@ -22,15 +22,21 @@ project "ImGui"
 
 		"imgui/backends/imgui_impl_vulkan.h",
 		"imgui/backends/imgui_impl_vulkan.cpp",
-		"imgui/backends/imgui_impl_sdl2.h",
-		"imgui/backends/imgui_impl_sdl2.cpp",
+		"imgui/backends/imgui_impl_glfw.h",
+		"imgui/backends/imgui_impl_glfw.cpp",
 	}
 
 	includedirs
 	{
-		"%{IncludeDir.SDL}",
+		"%{IncludeDir.glfw}",
 		"%{IncludeDir.ImGui}",
-		"%{IncludeDir.Vulkan}"
+		"%{IncludeDir.Vulkan_Headers}",
+	}
+
+	defines
+	{
+		"IMGUI_IMPL_VULKAN_NO_PROTOTYPES",
+		"VK_NO_PROTOTYPES"
 	}
 
 	filter "system:windows"

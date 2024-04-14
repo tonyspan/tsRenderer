@@ -1,46 +1,69 @@
 #pragma once
 
-#include "Base.h"
+#include <cstdint>
+#include <memory>
+#include <cassert>
 
-#include "VK.h"
-
-struct BufferDescription
-{
-	VkDeviceSize Size = 0;
-	VkBufferUsageFlags Usage = (VkBufferUsageFlags)VK_MAX_VALUE_ENUM;
-	VkMemoryPropertyFlags Properties = (VkMemoryPropertyFlags)VK_MAX_VALUE_ENUM;
-
-	// Used only in the IndexBuffer
-	// TODO: probably IndexBuffer class is needed
-	uint32_t IndexCount = 0;
-};
-
-class Buffer : public Handle<VkBuffer, VkDeviceMemory>
+// Non-owning Buffer
+class Buffer
 {
 public:
-	static Ref<Buffer> Create(const BufferDescription& desc);
+	Buffer() = default;
 
-	static Ref<Buffer> CreateVertex(VkDeviceSize size, const void* data = nullptr);
-	static Ref<Buffer> CreateIndex(VkDeviceSize size, uint32_t count, const void* data = nullptr);
-	static Ref<Buffer> CreateUniform(VkDeviceSize size);
-	static Scope<Buffer> CreateStaging(VkDeviceSize size);
+	Buffer(void* data, uint64_t size);
 
-	Buffer(const BufferDescription& desc);
-	~Buffer();
+	static Buffer Copy(const void* data, uint64_t size);
+	static Buffer Copy(const Buffer& buffer);
 
-	DELETE_COPY_AND_MOVE(Buffer);
+	void Allocate(uint64_t size);
+	void Release();
+	void ZeroInit();
 
-	void Init(const BufferDescription& desc);
+	explicit operator bool() const { return m_Data; }
 
-	void SetData(const void* data, VkDeviceSize size, VkDeviceSize offset = 0);
-	// Will use the size defined with BufferDescription::Size
-	void SetData(const void* data);
+	uint8_t& operator[](uint64_t index)
+	{
+		assert(index < m_Size);
 
-	const BufferDescription& GetDescription() const;
+		return m_Data[index];
+	}
+
+	const uint8_t& operator[](uint64_t index) const
+	{
+		assert(index < m_Size);
+
+		return m_Data[index];
+	}
+
+	template <typename T>
+	T& Read(uint64_t offset = 0)
+	{
+		assert(offset < m_Size);
+
+		return *(T*)(m_Data + offset);
+	}
+
+	void Write(void* data, uint64_t size, uint64_t offset = 0)
+	{
+		assert(offset + size <= m_Size);
+
+		memcpy(m_Data + offset, data, size);
+	}
+
+	template <typename T>
+	T* As()
+	{
+		return reinterpret_cast<T*>(m_Data);
+	}
+
+	template <typename T>
+	const T* As() const
+	{
+		return reinterpret_cast<const T*>(m_Data);
+	}
+
+	const uint64_t GetSize() const;
 private:
-	void CreateBuffer();
-private:
-	BufferDescription m_Description;
-
-	bool m_IsInitialized = false;
+	uint8_t* m_Data = nullptr;
+	uint64_t m_Size = 0;
 };

@@ -35,45 +35,18 @@ private:
 private:
 	uint32_t m_Stride;
 	std::vector<LayoutElement> m_Elements;
-
 };
 
-#pragma region Specialization
-
-template <>
-inline void Layout::Add<uint32_t>(const std::string& name)
-{
-	Add(name, Format::R32_UINT, sizeof(uint32_t));
+#define LAYOUT_SPECIALIZATION(TYPE, FORMAT) \
+template <> \
+inline void Layout::Add<TYPE>(const std::string& name) \
+{ \
+	Add(name, FORMAT, sizeof(TYPE)); \
 }
 
-template <>
-inline void Layout::Add<uint8_t>(const std::string& name)
-{
-	Add(name, Format::R8_UINT, sizeof(uint8_t));
-}
-
-template <>
-inline void Layout::Add<float>(const std::string& name)
-{
-	Add(name, Format::R32_SFLOAT, sizeof(float));
-}
-
-template <>
-inline void Layout::Add<glm::vec2>(const std::string& name)
-{
-	Add(name, Format::RG_32_SFLOAT, sizeof(glm::vec2));
-}
-
-template <>
-inline void Layout::Add<glm::vec3>(const std::string& name)
-{
-	Add(name, Format::RGB_32_SFLOAT, sizeof(glm::vec3));
-}
-
-template <>
-inline void Layout::Add<glm::vec4>(const std::string& name)
-{
-	Add(name, Format::RGBA_32_SFLOAT, sizeof(glm::vec4));
-}
-
-#pragma endregion
+LAYOUT_SPECIALIZATION(uint32_t, Format::R32_UINT)
+LAYOUT_SPECIALIZATION(uint8_t, Format::R8_UINT)
+LAYOUT_SPECIALIZATION(float, Format::R32_SFLOAT)
+LAYOUT_SPECIALIZATION(glm::vec2, Format::RG_32_SFLOAT)
+LAYOUT_SPECIALIZATION(glm::vec3, Format::RGB_32_SFLOAT)
+LAYOUT_SPECIALIZATION(glm::vec4, Format::RGBA_32_SFLOAT)

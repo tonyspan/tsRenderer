@@ -5,10 +5,11 @@
 #include <utility>
 
 struct Event;
+struct ResizeEvent;
 
 class CommandBuffer;
 
-class Gui;
+class IMGUI;
 
 class Application
 {
@@ -26,13 +27,12 @@ protected:
 	virtual void OnShutdown() = 0;
 	virtual void OnEvent(Event& event) = 0;
 private:
-	void OnClose(Event& event);
-	void OnResize(Event& event);
-	void OnMinimize(Event& event);
+	void AppEvent(Event& event);
+	void OnResize(ResizeEvent& event);
 private:
 	Scope<Window> m_Window;
 	bool m_ShouldClose = false;
 	bool m_Minimized = false;
 
-	Ref<Gui> m_ImGui;
+	Ref<IMGUI> m_ImGui;
 };

@@ -163,11 +163,12 @@ typedef union VkClearColorValue VkClearColorValue;
 
 const char* VkResultString(VkResult result);
 
-// Need to include "Base.h" before including this header
+// Need to include "Log.h" before including this header
 #define VK_CHECK_RESULT(X) { \
 	VkResult _res = (X); \
 	if (_res != VK_SUCCESS) \
 	{ \
-		LOG("%s, line %i: VkResult is %s", LOCATION().function_name(), LOCATION().line(), VkResultString(_res)); \
+		SRC_LOC(); \
+		LOG("%s, line %i: VkResult is %s", func, line, VkResultString(_res)); \
 	} \
 }

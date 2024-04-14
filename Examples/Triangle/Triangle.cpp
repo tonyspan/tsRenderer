@@ -10,7 +10,7 @@ class Triangle : public Application
 protected:
 	virtual void OnInit() override
 	{
-		Shader::CompileShaders(GetProjectDirectory() + "/Shaders/");
+		ShaderCompiler::CompileWithValidator(GetProjectDirectory() + "/Shaders/");
 
 		Layout layout;
 		layout.Add<glm::vec3>("inPosition");
@@ -23,8 +23,8 @@ protected:
 
 		std::vector<uint32_t> indices = { 0, 1, 2 };
 
-		m_VertexBuffer = Buffer::CreateVertex(vertices.size() * sizeof(Triangle::Vertex), vertices.data());
-		m_IndexBuffer = Buffer::CreateIndex(indices.size() * sizeof(uint32_t), static_cast<uint32_t>(indices.size()), indices.data());
+		m_VertexBuffer = GBuffer::CreateVertex(vertices.size() * sizeof(Triangle::Vertex), vertices.data());
+		m_IndexBuffer = GBuffer::CreateIndex(indices.size() * sizeof(uint32_t), static_cast<uint32_t>(indices.size()), indices.data());
 
 		PipelineDescription desc;
 
@@ -61,8 +61,8 @@ protected:
 	}
 private:
 	Ref<Pipeline> m_Pipeline;
-	Ref<Buffer> m_VertexBuffer;
-	Ref<Buffer> m_IndexBuffer;
+	Ref<GBuffer> m_VertexBuffer;
+	Ref<GBuffer> m_IndexBuffer;
 };
 
 int main(int argc, char** argv)

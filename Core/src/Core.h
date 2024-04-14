@@ -13,6 +13,7 @@
 #include "Camera.h"
 
 #include "Buffer.h"
+#include "GBuffer.h"
 #include "Layout.h"
 
 #include "Texture.h"
@@ -23,6 +24,7 @@
 #include "DescriptorSet.h"
 #include "Pipeline.h"
 #include "Shader.h"
+#include "ShaderCompiler.h"
 
 // TODO: Move them elsewhere?
 #define GLM_FORCE_RADIANS

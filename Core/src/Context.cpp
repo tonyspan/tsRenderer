@@ -20,6 +20,7 @@ struct ContextData
 
 	void Init(const Window& window)
 	{
+
 		Inst = CreateScope<Instance>(window);
 		Surf = CreateScope<Surface>(*Inst, window);
 		Dev = CreateScope<Device>(*Inst, *Surf);

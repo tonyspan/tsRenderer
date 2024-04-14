@@ -7,28 +7,28 @@
 #include <string_view>
 #include <span>
 
-class Buffer;
+class GBuffer;
 
 class Mesh
 {
 public:
 	static Ref<Mesh> Create(const std::string_view file);
 	static Ref<Mesh> Create(const std::span<Vertex> vertices, const std::span<uint32_t> indices);
-	static Ref<Mesh> Create(const Ref<Buffer>& vb, const Ref<Buffer>& ib);
+	static Ref<Mesh> Create(const Ref<GBuffer>& vb, const Ref<GBuffer>& ib);
 
 	Mesh(const std::span<Vertex> vertices, const std::span<uint32_t> indices);
-	Mesh(const Ref<Buffer>& vb, const Ref<Buffer>& ib);
+	Mesh(const Ref<GBuffer>& vb, const Ref<GBuffer>& ib);
 	~Mesh();
 
 	void SetName(const std::string_view name);
 
-	const Buffer& GetVertexBuffer() const;
-	const Buffer& GetIndexBuffer() const;
+	const GBuffer& GetVertexBuffer() const;
+	const GBuffer& GetIndexBuffer() const;
 
 	uint32_t GetIndexCount() const;
 private:
 	std::string m_Name;
 
-	Ref<Buffer> m_VertexBuffer;
-	Ref<Buffer> m_IndexBuffer;
+	Ref<GBuffer> m_VertexBuffer;
+	Ref<GBuffer> m_IndexBuffer;
 };

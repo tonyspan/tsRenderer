@@ -27,7 +27,7 @@ struct ImageDescription
 	bool IsSwapchainImage = false;
 };
 
-class Buffer;
+class GBuffer;
 
 class Image2D : public Handle<VkImage, VkImageView, VkDeviceMemory>
 {
@@ -41,7 +41,7 @@ public:
 	~Image2D();
 
 	void TransitionImageLayout(VkImageLayout newLayout, VkImageLayout oldLayout = (VkImageLayout)0);
-	void CopyFrom(const Buffer& buffer);
+	void CopyFrom(const GBuffer& buffer);
 
 	uint32_t GetWidth() const;
 	uint32_t GetHeight() const;

@@ -6,11 +6,12 @@
 #include "DescriptorPool.h"
 #include "Image.h"
 #include "Texture.h"
-#include "Buffer.h"
+#include "GBuffer.h"
 #include "Sampler.h"
 
 #include "Log.h"
 
+#include <volk.h>
 #include <vulkan/vulkan.h>
 
 const DescriptorSetElement& DescriptorSetLayout::GetElement(uint32_t index) const
@@ -53,7 +54,7 @@ DescriptorSet::~DescriptorSet()
 	vkDestroyDescriptorSetLayout(Context::GetDevice().GetHandle(), m_DescriptorSetLayout, nullptr);
 }
 
-void DescriptorSet::SetBuffer(uint32_t binding, const Buffer& buffer)
+void DescriptorSet::SetBuffer(uint32_t binding, const GBuffer& buffer)
 {
 	ASSERT(binding != ~0);
 
@@ -97,29 +98,28 @@ void DescriptorSet::SetTexture(uint32_t binding, const Texture& texture)
 
 	for (uint32_t i = 0; i < imageCount; i++)
 	{
-		switch (texture.GetType())
-		{
-		case TextureType::TEXTURE:
+		const auto textureType = texture.GetType();
+		if (TextureType::TEXTURE2D == textureType)
 		{
 			const auto& texture2D = static_cast<const Texture2D&>(texture);
 			imageInfo.imageView = texture2D.GetImage().GetHandle<VkImageView>();
-			imageInfo.sampler = texture2D.GetSampler().GetHandle();
 
-			break;
+			auto sampler = texture2D.GetSampler();
+			if (sampler)
+				imageInfo.sampler = sampler->GetHandle();
 		}
-		case TextureType::CUBE:
+		else if (TextureType::CUBE == textureType)
 		{
 			const auto& textureCube = static_cast<const TextureCube&>(texture);
 			imageInfo.imageView = textureCube.GetImage().GetHandle<VkImageView>();
-			imageInfo.sampler = textureCube.GetSampler().GetHandle();
 
-			break;
+			auto sampler = textureCube.GetSampler();
+			if (sampler)
+				imageInfo.sampler = sampler->GetHandle();
 		}
-		default:
+		else
 		{
 			ASSERT(false);
-			break;
-		}
 		}
 
 		descriptorWrite.dstSet = m_DescriptorSets[i];

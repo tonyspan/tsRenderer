@@ -32,6 +32,7 @@ enum class Format : int
 
 VkFormat Convert(Format format);
 uint32_t FormatBytesPerPixel(Format format);
+Format FormatBytesPerPixel(uint32_t channels);
 
 // Unused
 enum class MSAASamples
@@ -139,7 +140,7 @@ enum class TextureType : int
 {
 	UNDEFINED = 0,
 
-	TEXTURE,
+	TEXTURE2D,
 	CUBE
 };
 

@@ -11,6 +11,8 @@
 #include "Log.h"
 #include "Profiler.h"
 
+
+#include <volk.h>
 #include <vulkan/vulkan.h>
 
 #include <glm/glm.hpp>
@@ -141,8 +143,8 @@ const Framebuffer& Swapchain::GetCurrentFramebuffer() const
 
 void Swapchain::CreateSwapchain()
 {
-	ASSERT(m_Description.FramesInFlight > 0, STR(m_Description.FramesInFlight) " <= 0");
-	ASSERT(m_Description.Width != 0 && m_Description.Height != 0, STR(m_Description.Width, m_Description.Height) " == 0");
+	ASSERT(0 < m_Description.FramesInFlight, STR(m_Description.FramesInFlight) " <= 0");
+	ASSERT(0 < m_Description.Width && 0 < m_Description.Height, STR(m_Description.Width, m_Description.Height) " == 0");
 
 	const PhysicalDevice& physicalDevice = m_Device.GetPhysicalDevice();
 
@@ -307,7 +309,6 @@ void Swapchain::CreateFramebuffers()
 	desc.Height = m_Description.Height;
 	desc.ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
 	desc.RenderPass = m_RenderPass.get();
-	desc.MSAAnumSamples = s_MSAA;
 
 	for (uint32_t i = 0; i < m_FrameData.size(); i++)
 	{

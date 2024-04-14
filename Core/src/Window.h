@@ -4,10 +4,7 @@
 
 #include <string_view>
 #include <functional>
-#include <unordered_map>
-
-struct SDL_Window;
-union SDL_Event;
+#include <utility>
 
 struct WindowDescription
 {
@@ -24,37 +21,11 @@ struct WindowDescription
 	}
 };
 
-// TODO: Move EventType, Event elsewhere?
-
-enum class EventType : int { UNDEFINED = 0, QUIT, RESIZED, MININIZED, RESTORED };
-
-struct Event
-{
-	uint32_t Width = 0;
-	uint32_t Height = 0;
-	bool Quit = false;
-	bool IsMinimized = false;
-};
+struct GLFWwindow;
+struct Event;
 
 class Window
 {
-	class EventHandler
-	{
-	public:
-		EventHandler();
-		~EventHandler();
-
-		using EventCallbackFn = std::function<void(Event&)>;
-
-		void Register(EventType type, EventCallbackFn&& cb);
-
-		void Poll();
-
-	private:
-		std::unordered_map<EventType, EventCallbackFn> m_Callbacks;
-		SDL_Event* m_Event = nullptr;
-	};
-
 public:
 	Window(const WindowDescription& desc);
 	~Window();
@@ -67,24 +38,32 @@ public:
 
 	[[deprecated("Use OnResize()")]]
 	void SetWidth(uint32_t width);
+	[[deprecated("Use GetSize()")]]
 	uint32_t GetWidth() const;
 
 	[[deprecated("Use OnResize()")]]
 	void SetHeight(uint32_t height);
+	[[deprecated("Use GetSize()")]]
 	uint32_t GetHeight() const;
 
+	std::pair<uint32_t, uint32_t> GetSize() const;
 	void OnResize(uint32_t width, uint32_t height);
 
 	void EnableVSync(bool enable);
 	bool HasVSync() const;
 
-	void RegisterCallback(EventType type, Window::EventHandler::EventCallbackFn&& cb);
+	void SetEventCallback(const std::function<void(Event&)>& cb);
 
 	template<typename T>
 	T* GetHandle() const;
 private:
-	SDL_Window* m_Window = nullptr;
-	WindowDescription m_Description;
+	void SetupCallbacks();
+private:
+	struct WindowData
+	{
+		WindowDescription Description;
+		std::function<void(Event&)> EventCallback;
+	} m_Data;
 
-	EventHandler m_EventHandler;
+	GLFWwindow* m_Window = nullptr;
 };

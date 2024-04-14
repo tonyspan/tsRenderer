@@ -1,5 +1,5 @@
-project "tinyobjloader"
-    location "tinyobjloader"
+project "Vulkan-Headers"
+    location "Vulkan-Headers"
     kind "None"
     language "C++"
 
@@ -8,13 +8,14 @@ project "tinyobjloader"
 
     files
     {
-        "tinyobjloader/**.hpp",
-        "tinyobjloader/**.h"
+       "Vulkan-Headers/include/**.h",
     }
 
-    includedirs
-    {
-    }
+	includedirs
+	{
+		"Vulkan-Headers/include/vk_video",
+		"Vulkan-Headers/include/vulkan",
+	}
 
 	filter "system:windows"
 		systemversion "latest"

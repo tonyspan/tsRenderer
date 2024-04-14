@@ -5,7 +5,7 @@
 #include "VK.h"
 
 class CommandBuffer;
-class Buffer;
+class GBuffer;
 class Pipeline;
 class DescriptorSet;
 
@@ -25,11 +25,11 @@ public:
 	void EndSingleTime();
 
 	void BindDescriptorSet(const DescriptorSet& set);
-	void BindVertexBuffer(const Buffer& buffer);
-	void BindIndexBuffer(const Buffer& buffer);
+	void BindVertexBuffer(const GBuffer& buffer);
+	void BindIndexBuffer(const GBuffer& buffer);
 	void BindPipeline(const Pipeline& pipeline);
 
-	void Draw(uint32_t vertexCount);
+	void Draw(uint32_t vertexCount, uint32_t firstIndex = 0);
 	void DrawIndexed(uint32_t indexCount, uint32_t firstIndex = 0);
 private:
 	void CreateCommandBuffer(bool isPrimary);
