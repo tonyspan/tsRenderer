@@ -141,6 +141,8 @@ VK_FWD_DECL_STRUCT(VkPhysicalDeviceMemoryProperties)
 VK_FWD_DECL_STRUCT(VkPhysicalDeviceFeatures)
 VK_FWD_DECL_STRUCT(VkPhysicalDeviceProperties)
 VK_FWD_DECL_STRUCT(VkQueueFamilyProperties)
+VK_FWD_DECL_STRUCT(VkDescriptorSetLayoutBinding)
+VK_FWD_DECL_STRUCT(VkPushConstantRange)
 
 VK_FWD_DECL_ENUM(VkResult)
 VK_FWD_DECL_ENUM(VkPresentModeKHR)

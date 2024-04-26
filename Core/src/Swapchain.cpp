@@ -51,18 +51,10 @@ void Swapchain::BeginFrame()
 		OnResize(m_Description.Width, m_Description.Height);
 	}
 	ASSERT(result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR, "Failed to acquire Swapchain image");
-
-	auto& cmdBuffer = GetCurrentCommandBuffer();
-	cmdBuffer.BeginRecording();
-	m_RenderPass->Begin(cmdBuffer, GetCurrentFramebuffer());
 }
 
 void Swapchain::EndFrame()
 {
-	auto& cmdBuffer = GetCurrentCommandBuffer();
-	m_RenderPass->End(cmdBuffer);
-	cmdBuffer.EndRecording();
-
 	std::array waitSemaphores = { GetCurrentSemaphores().PresentFinished->GetHandle() };
 	std::array signalSemaphores = { GetCurrentSemaphores().RenderFinished->GetHandle() };
 	std::array commandBuffers = { GetCurrentCommandBuffer().GetHandle() };
@@ -126,7 +118,7 @@ Ref<RenderPass> Swapchain::GetRenderPass() const
 	return m_RenderPass;
 }
 
-CommandBuffer& Swapchain::GetCurrentCommandBuffer() const
+const CommandBuffer& Swapchain::GetCurrentCommandBuffer() const
 {
 	return *GetFrameData(m_ImageIndex).CommandBuffer;
 }
@@ -458,11 +450,6 @@ Swapchain::FrameData& Swapchain::GetFrameData(uint32_t index)
 	ASSERT(index >= 0 && index <= GetImageCount());
 
 	return m_FrameData.at(index);
-}
-
-Framebuffer& Swapchain::GetCurrentFramebuffer()
-{
-	return *GetFrameData(m_ImageIndex).Framebuffer;
 }
 
 Fence& Swapchain::GetCurrentFence()

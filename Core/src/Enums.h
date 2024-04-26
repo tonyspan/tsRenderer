@@ -31,6 +31,7 @@ enum class Format : int
 };
 
 VkFormat Convert(Format format);
+uint32_t GetStrideFromFormat(VkFormat format);
 uint32_t FormatBytesPerPixel(Format format);
 Format FormatBytesPerPixel(uint32_t channels);
 
@@ -82,6 +83,8 @@ enum class DescriptorType : int
 };
 
 VkDescriptorType Convert(DescriptorType type);
+DescriptorType Convert(VkDescriptorType type);
+const char* DescriptorTypeString(DescriptorType type);
 
 enum class CullMode
 {
@@ -161,4 +164,12 @@ enum class AttachmentType
 	COLOR,
 	DEPTH,
 	DEPTH_STNCIL
+};
+
+enum class MeshPrimitiveType : int
+{
+	NONE = 0,
+
+	CUBE,
+	SPHERE
 };

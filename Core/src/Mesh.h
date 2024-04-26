@@ -2,6 +2,8 @@
 
 #include "Base.h"
 
+#include "Enums.h"
+
 #include "Vertex.h"
 
 #include <string_view>
@@ -15,6 +17,8 @@ public:
 	static Ref<Mesh> Create(const std::string_view file);
 	static Ref<Mesh> Create(const std::span<Vertex> vertices, const std::span<uint32_t> indices);
 	static Ref<Mesh> Create(const Ref<GBuffer>& vb, const Ref<GBuffer>& ib);
+
+	static Ref<Mesh> Create(MeshPrimitiveType type);
 
 	Mesh(const std::span<Vertex> vertices, const std::span<uint32_t> indices);
 	Mesh(const Ref<GBuffer>& vb, const Ref<GBuffer>& ib);

@@ -96,7 +96,7 @@ static Ref<T> TryCreate(const std::span<const std::string_view> paths)
 
 			stbi_image_free(data);
 
-			LOG("Loaded %s, size: (%ix%i), channels: %i", path.data(), width, height, channels);
+			LOG("Loaded %s, size: (%ix%i), channels: %i", QUOTED(path), width, height, channels);
 		}
 	}
 
@@ -137,7 +137,7 @@ Ref<Texture> Texture::White<TextureType::TEXTURE2D>()
 template<>
 Ref<Texture> Texture::White<TextureType::CUBE>()
 {
-	static constexpr uint32_t s_WhiteTextureData[6] = { 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff };
+	static constexpr uint32_t s_WhiteTextureData[s_MaxImageCount] = { 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff };
 
 	TextureDescription desc;
 
@@ -222,7 +222,7 @@ void Texture::CreateTexture(const Buffer& buffer)
 		desc.ImageCreateFlags = 0;
 		desc.ViewType = VK_IMAGE_VIEW_TYPE_2D;
 
-		stagingBuffer->SetData(buffer.As<uint8_t>());
+		stagingBuffer->SetData(buffer.As<const uint8_t*>());
 	}
 
 	m_Image = Image2D::Create(desc);

@@ -7,8 +7,6 @@
 #include <span>
 #include <optional>
 
-class CommandBuffer;
-class Framebuffer;
 class Image2D;
 
 struct RenderPassDescription
@@ -24,9 +22,6 @@ public:
 
 	RenderPass(const RenderPassDescription& desc);
 	~RenderPass();
-
-	void Begin(const CommandBuffer& commandBuffer, const Framebuffer& framebuffer);
-	void End(const CommandBuffer& commandBuffer);
 
 	const RenderPassDescription& GetDescription() const;
 private:

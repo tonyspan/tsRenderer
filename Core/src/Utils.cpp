@@ -3,9 +3,9 @@
 #include "Log.h"
 
 #include "Buffer.h"
+#include "FileStream.h"
 
 #include <filesystem>
-#include <fstream>
 
 std::string GetProjectDirectory()
 {
@@ -25,47 +25,46 @@ bool ReadFromFile(Buffer& buffer, const std::filesystem::path& path)
 	if (path.empty())
 		return false;
 
-	const std::string& pathString = path.string();
+	FileStreamReader stream(path);
 
-	std::ifstream stream(pathString.data(), std::ios::binary | std::ios::ate);
-
-	if (!stream.is_open())
+	if (!stream.IsStreamGood())
 	{
-		LOG("Failed to open %s", pathString.data());
+		LOG("Failed to open %s", path.string().data());
 		return false;
 	}
 
-	std::streampos end = stream.tellg();
-	stream.seekg(0, std::ios::beg);
-	size_t size = end - stream.tellg();
+	auto size = stream.GetFileSize();
 
 	buffer.Allocate(size);
 
-	if (size > 0)
-	{
-		stream.read(buffer.As<char>(), size);
-		stream.close();
-	}
+	stream.Read(buffer);
 
 	return true;
 }
 
 bool WriteToFile(const std::filesystem::path& path, const Buffer& buffer)
 {
-	const std::string& pathString = path.string();
+	FileStreamWriter stream(path);
 
-	std::ofstream stream(pathString.data(), std::ios::out | std::ios::binary);
-
-	if (!stream.is_open())
+	if (!stream.IsStreamGood())
 	{
-		LOG("Failed to open %s", pathString.data());
+		LOG("Failed to open %s", path.string().data());
 		return false;
 	}
 
-	stream.write(buffer.As<char>(), (size_t)buffer.GetSize());
-	stream.close();
+	stream.Write(buffer);
 
 	return true;
+}
+
+uint64_t HashString(const std::string& str)
+{
+	uint64_t hash = 5381;
+
+	for (const auto& c : str)
+		hash = 33 * hash + static_cast<uint64_t>(c);
+
+	return hash;
 }
 
 void Delete(const std::filesystem::path& path, const std::string& what)

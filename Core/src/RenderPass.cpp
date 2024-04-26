@@ -30,34 +30,6 @@ RenderPass::~RenderPass()
 	vkDestroyRenderPass(Context::GetDevice().GetHandle(), Handle::GetHandle(), nullptr);
 }
 
-void RenderPass::Begin(const CommandBuffer& commandBuffer, const Framebuffer& framebuffer)
-{
-	VkRenderPassBeginInfo renderPassInfo;
-	ZeroInitVkStruct(renderPassInfo, VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO);
-
-	const auto& framebufferDesc = framebuffer.GetDescription();
-	const auto& clearColor = framebufferDesc.ClearColor;
-
-	renderPassInfo.renderPass = Handle::GetHandle();
-	renderPassInfo.framebuffer = framebuffer.GetHandle();
-	renderPassInfo.renderArea.offset = { 0, 0 };
-	renderPassInfo.renderArea.extent = { .width = framebufferDesc.Width, .height = framebufferDesc.Height };
-
-	std::array<VkClearValue, 2> clearValues{};
-	clearValues[0].color = { { clearColor.r, clearColor.g, clearColor.b, clearColor.a } };
-	clearValues[1].depthStencil = { 1.0f, 0 };
-
-	renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-	renderPassInfo.pClearValues = clearValues.data();
-
-	vkCmdBeginRenderPass(commandBuffer.GetHandle(), &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-}
-
-void RenderPass::End(const CommandBuffer& commandBuffer)
-{
-	vkCmdEndRenderPass(commandBuffer.GetHandle());
-}
-
 const RenderPassDescription& RenderPass::GetDescription() const
 {
 	return m_Description;

@@ -14,8 +14,7 @@ project "Cube"
 	{
 		"%{wks.location}/Core/src",
 		"%{IncludeDir.glm}",
-		"%{IncludeDir.stb}",
-		"%{IncludeDir.tinyobj}",
+		"%{IncludeDir.ImGui}"
 	}
 
 	links

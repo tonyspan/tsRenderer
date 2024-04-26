@@ -43,6 +43,8 @@ private:
 	VkPhysicalDeviceProperties* m_Properties;
 };
 
+class DescriptorPool;
+
 class Device : public Handle<VkDevice>
 {
 public:
@@ -55,6 +57,7 @@ public:
 	VkQueue GetGraphicsQueue() const;
 	VkQueue GetPresentQueue() const;
 	const CommandPool& GetCommandPool() const;
+	const DescriptorPool& GetDescriptorPool() const;
 private:
 	void CreateDeviceAndQueues();
 private:
@@ -64,4 +67,5 @@ private:
 
 	// Should it be here?
 	Scope<CommandPool> m_CommandPool;
+	Scope<DescriptorPool> m_DescriptorPool;
 };

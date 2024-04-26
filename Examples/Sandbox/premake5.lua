@@ -14,9 +14,6 @@ project "Sandbox"
 	{
 		"%{wks.location}/Core/src",
 		"%{IncludeDir.glm}",
-		"%{IncludeDir.stb}",
-		"%{IncludeDir.tinyobj}",
-		--"%{IncludeDir.Vulkan}"
 	}
 
 	links

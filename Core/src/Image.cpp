@@ -62,7 +62,7 @@ Image2D::~Image2D()
 void Image2D::TransitionImageLayout(VkImageLayout newLayout, VkImageLayout oldLayout)
 {
 	Ref<CommandBuffer> commandBuffer = CommandBuffer::Create(true);
-	commandBuffer->BeginSingleTime();
+	commandBuffer->BeginRecording(true);
 
 	VkImageMemoryBarrier barrier;
 	ZeroInitVkStruct(barrier, VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER);
@@ -123,13 +123,14 @@ void Image2D::TransitionImageLayout(VkImageLayout newLayout, VkImageLayout oldLa
 
 	vkCmdPipelineBarrier(commandBuffer->GetHandle(), sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 
-	commandBuffer->EndSingleTime();
+	commandBuffer->EndRecording();
+	commandBuffer->Submit();
 }
 
 void Image2D::CopyFrom(const GBuffer& buffer)
 {
 	Ref<CommandBuffer> commandBuffer = CommandBuffer::Create(true);
-	commandBuffer->BeginSingleTime();
+	commandBuffer->BeginRecording(true);
 
 	VkBufferImageCopy region = {};
 
@@ -145,7 +146,8 @@ void Image2D::CopyFrom(const GBuffer& buffer)
 
 	vkCmdCopyBufferToImage(commandBuffer->GetHandle(), buffer.GetHandle<VkBuffer>(), Handle::GetHandle<VkImage>(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
-	commandBuffer->EndSingleTime();
+	commandBuffer->EndRecording();
+	commandBuffer->Submit();
 
 	GenerateMipMaps();
 }
@@ -250,7 +252,7 @@ void Image2D::GenerateMipMaps()
 	ASSERT(formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT, "Image format doesn't support linear blitting");
 
 	Ref<CommandBuffer> commandBuffer = CommandBuffer::Create(true);
-	commandBuffer->BeginSingleTime();
+	commandBuffer->BeginRecording(true);
 
 	VkImageMemoryBarrier barrier;
 	ZeroInitVkStruct(barrier, VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER);
@@ -321,5 +323,6 @@ void Image2D::GenerateMipMaps()
 	barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 	vkCmdPipelineBarrier(commandBuffer->GetHandle(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 
-	commandBuffer->EndSingleTime();
+	commandBuffer->EndRecording();
+	commandBuffer->Submit();
 }

@@ -5,17 +5,17 @@ layout (location = 1) in vec3 inNormal;
 layout (location = 2) in vec2 inTexCoord;
 layout (location = 3) in vec4 inColor;
 
-layout(location = 0) out vec2 outTexCoord;
+layout (location = 0) out vec4 outColor;
 
-layout(set = 0, binding = 0) uniform UBO
+layout (binding = 0) uniform UBO
 {
-    mat4 MVP;
     mat4 Model;
-    mat4 Normal;
+    mat4 View;
+    mat4 Projection;
 } ubo;
 
 void main()
 {
-    gl_Position = vec4(inPosition, 1.0);
-    outTexCoord = inTexCoord;
+    outColor = inColor;
+    gl_Position = ubo.Projection * ubo.View * ubo.Model * vec4(inPosition, 1.0);
 }

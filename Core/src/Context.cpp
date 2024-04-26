@@ -71,12 +71,6 @@ Instance& Context::GetInstance()
 	return *s_Data->Inst;
 }
 
-//Surface& Context::GetSurface()
-//{
-//	ASSERT(s_Data && s_Data->Surf);
-//	return *s_Data->Surf;
-//}
-
 Device& Context::GetDevice()
 {
 	ASSERT(s_Data && s_Data->Dev);
@@ -87,10 +81,4 @@ Swapchain& Context::GetSwapchain()
 {
 	ASSERT(s_Data && s_Data->SwapChain);
 	return *s_Data->SwapChain;
-}
-
-DescriptorPool& Context::GetDescriptorPool()
-{
-	ASSERT(s_Data && s_Data->DescPool);
-	return *s_Data->DescPool;
 }

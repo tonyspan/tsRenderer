@@ -15,10 +15,8 @@
 class Window;
 
 class Instance;
-//class Surface;
 class Device;
 class Swapchain;
-class DescriptorPool;
 #endif
 
 class Context
@@ -31,6 +29,4 @@ public:
 	//static Surface& GetSurface();
 	static Device& GetDevice();
 	static Swapchain& GetSwapchain();
-
-	static DescriptorPool& GetDescriptorPool();
 };
