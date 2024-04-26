@@ -33,7 +33,7 @@ public:
 private:
 	void Add(const std::string& name, Format format, uint32_t size);
 private:
-	uint32_t m_Stride;
+	uint32_t m_Stride = 0;
 	std::vector<LayoutElement> m_Elements;
 };
 

@@ -20,24 +20,12 @@
 
 void Application::Run()
 {
-	WindowDescription desc;
-
-	desc.VSync = true;
-	m_Window = Window::Create(desc);
-
-	m_Window->SetEventCallback(BIND_FUNC(AppEvent));
-
-	Input::SetWindow(*m_Window);
-
-	Context::Init(*m_Window);
-
-	m_ImGui = IMGUI::Create(*m_Window);
-
-	auto& swapchain = Context::GetSwapchain();
-
+	AppInit();
 	OnInit();
 
 	Timer timer;
+
+	auto& swapchain = Context::GetSwapchain();
 
 	while (!m_ShouldClose)
 	{
@@ -55,7 +43,12 @@ void Application::Run()
 			m_ImGui->NewFrame();
 
 			auto& commandBuffer = swapchain.GetCurrentCommandBuffer();
-			Render(commandBuffer);
+
+			commandBuffer.BeginRecording();
+			commandBuffer.BeginRenderPass(*swapchain.GetRenderPass(), swapchain.GetCurrentFramebuffer());
+
+			OnRender(commandBuffer);
+
 
 			if (ImGui::Begin("Stats", NULL, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize))
 			{
@@ -68,6 +61,9 @@ void Application::Run()
 
 			m_ImGui->Render(commandBuffer);
 
+			commandBuffer.EndRenderPass();
+			commandBuffer.EndRecording();
+
 			swapchain.EndFrame();
 		}
 	}
@@ -75,12 +71,7 @@ void Application::Run()
 	Context::GetDevice().WaitIdle();
 
 	OnShutdown();
-
-	m_ImGui->Shutdown();
-
-	Context::Shutdown();
-
-	m_Window.reset();
+	AppShutdown();
 }
 
 std::pair<uint32_t, uint32_t> Application::GetSize() const
@@ -91,6 +82,31 @@ std::pair<uint32_t, uint32_t> Application::GetSize() const
 	ASSERT(desc.Width == windowWidth && desc.Height == windowHeight);
 
 	return { desc.Width, desc.Height };
+}
+
+void Application::AppInit()
+{
+	WindowDescription desc;
+
+	desc.VSync = true;
+	m_Window = Window::Create(desc);
+
+	m_Window->SetEventCallback(BIND_FUNC(AppEvent));
+
+	Input::SetWindow(*m_Window);
+
+	Context::Init(*m_Window);
+
+	m_ImGui = IMGUI::Create(*m_Window);
+}
+
+void Application::AppShutdown()
+{
+	m_ImGui->Shutdown();
+
+	Context::Shutdown();
+
+	m_Window.reset();
 }
 
 void Application::AppEvent(Event& event)

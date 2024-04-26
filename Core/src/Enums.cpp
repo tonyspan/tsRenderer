@@ -3,7 +3,10 @@
 #include "Base.h"
 
 #include "Log.h"
-#include <volk.h>
+
+#include <vulkan/vulkan.h>
+
+#include <glm/glm.hpp>
 
 VkFormat Convert(Format format)
 {
@@ -33,6 +36,40 @@ VkFormat Convert(Format format)
 
 	ASSERT(false, "Unknown format type");
 	return VK_FORMAT_UNDEFINED;
+}
+
+uint32_t GetStrideFromFormat(VkFormat format)
+{
+	switch (format)
+	{
+	case VK_FORMAT_R8_SINT:
+		return sizeof(int);
+	case VK_FORMAT_R32_SFLOAT:
+		return sizeof(float);
+	case VK_FORMAT_R32G32_SFLOAT:
+		return sizeof(glm::vec2);
+	case VK_FORMAT_R32G32B32_SFLOAT:
+		return sizeof(glm::vec3);
+	case VK_FORMAT_R32G32B32A32_SFLOAT:
+		return sizeof(glm::vec4);
+	case VK_FORMAT_R32G32_SINT:
+		return sizeof(glm::ivec2);
+	case VK_FORMAT_R32G32B32_SINT:
+		return sizeof(glm::ivec3);
+	case VK_FORMAT_R32G32B32A32_SINT:
+		return sizeof(glm::ivec4);
+	case VK_FORMAT_R32G32_UINT:
+		return sizeof(glm::ivec2);
+	case VK_FORMAT_R32G32B32_UINT:
+		return sizeof(glm::ivec3);
+	case VK_FORMAT_R32G32B32A32_UINT:
+		return sizeof(glm::uvec4);
+	default:
+		break;
+	}
+
+	ASSERT(false, "Unknown format type");
+	return 0;
 }
 
 uint32_t FormatBytesPerPixel(Format format)
@@ -130,6 +167,45 @@ VkDescriptorType Convert(DescriptorType type)
 
 	ASSERT(false, "Unknown DescriptorType");
 	return VK_DESCRIPTOR_TYPE_MAX_ENUM;
+}
+
+DescriptorType Convert(VkDescriptorType type)
+{
+	switch (type)
+	{
+	case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+		return DescriptorType::COMBINED_IMAGE_SAMPLER;
+	case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+		return DescriptorType::UNIFORM_BUFFER;
+	default:
+		break;
+	}
+
+	ASSERT(false, "Unknown DescriptorType");
+	return DescriptorType::UNDEFINED;
+}
+
+const char* DescriptorTypeString(DescriptorType type)
+{
+	switch (type)
+	{
+	case DescriptorType::UNIFORM_BUFFER:
+		return "Uniform Buffer";
+	case DescriptorType::COMBINED_IMAGE_SAMPLER:
+		return "Combined Image Sampler";
+	case DescriptorType::SAMPLED_IMAGE:
+		return "Sampled Image";
+	case DescriptorType::SAMPLER:
+		return "Sampler";
+	case DescriptorType::DYNAMIC_UNIFORM_BUFFER:
+		return "Dynamic Uniform buffer";
+	case DescriptorType::STORAGE_IMAGE:
+		return "Storage Image";
+	default:
+		break;
+	}
+	ASSERT(false, "Unknown DescriptorType");
+	return nullptr;
 }
 
 VkCullModeFlagBits Convert(CullMode mode)

@@ -17,58 +17,35 @@
 // Set = 1 descriptor set containing uniform buffer and texture descriptors for per - material data, such as albedo map, Fresnel coefficients, etc.
 // Set = 2 descriptor set containing dynamic uniform buffer with per - draw data, such as world transform array
 
-struct DescriptorSetElement
-{
-	std::string Name;
-	uint32_t Binding = ~0;
-	DescriptorType Type = DescriptorType::UNDEFINED;
-	StageFlag Stage = StageFlag::UNDEFINED;
-};
-
-class DescriptorSetLayout
-{
-public:
-	DescriptorSetLayout() = default;
-
-	DescriptorSetLayout(const std::initializer_list<DescriptorSetElement> elements)
-		: m_Elements(elements)
-	{
-	}
-
-	DescriptorSetLayout(const std::vector<DescriptorSetElement>& elements)
-		: m_Elements(elements)
-	{
-	}
-
-	const DescriptorSetElement& GetElement(uint32_t index) const;
-	const std::vector<DescriptorSetElement>& GetElements() const;
-	uint32_t GetElementCount() const;
-private:
-	std::vector<DescriptorSetElement> m_Elements;
-};
-
 class Texture;
 class GBuffer;
+class Shader;
+
+struct DescriptorSetDescription
+{
+	WeakRef<Shader> Shader;
+};
 
 class DescriptorSet
 {
 public:
-	static Ref<DescriptorSet> Create(const DescriptorSetLayout& layout);
+	static Ref<DescriptorSet> Create(const DescriptorSetDescription& desc);
 
-	DescriptorSet(const DescriptorSetLayout& layout);
-
-	~DescriptorSet();
+	DescriptorSet(const DescriptorSetDescription& desc);
+	~DescriptorSet() = default;
 
 	void SetBuffer(uint32_t binding, const GBuffer& buffer);
-	void SetTexture(uint32_t binding, const Texture& texture);
+	void SetBuffer(const std::string& name, const GBuffer& buffer);
 
-	const VkDescriptorSetLayout GetLayout() const;
+	void SetTexture(uint32_t binding, const Texture& texture);
+	void SetTexture(const std::string& name, const Texture& texture);
+
 	VkDescriptorSet GetDescriptorSet() const;
 private:
-	void CreateDescriptorSetLayout(const DescriptorSetLayout& layout);
 	void CreateDescriptorSet();
 private:
-	VkDescriptorSetLayout m_DescriptorSetLayout;
 	std::vector<VkDescriptorSet> m_DescriptorSets;
-	//std::map<uint32_t, std::map<uint32_t, VkDescriptorSet>> m_DescriptorSets;
+
+	uint32_t m_ImageCount = 0;
+	WeakRef<Shader> m_Shader;
 };

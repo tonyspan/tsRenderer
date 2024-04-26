@@ -23,10 +23,12 @@ public:
 protected:
 	virtual void OnInit() = 0;
 	virtual void OnUpdate(float dt) = 0;
-	virtual void Render(CommandBuffer& commandBuffer) = 0;
+	virtual void OnRender(CommandBuffer& commandBuffer) = 0;
 	virtual void OnShutdown() = 0;
 	virtual void OnEvent(Event& event) = 0;
 private:
+	void AppInit();
+	void AppShutdown();
 	void AppEvent(Event& event);
 	void OnResize(ResizeEvent& event);
 private:

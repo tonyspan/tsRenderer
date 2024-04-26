@@ -6,31 +6,40 @@
 
 #include "Enums.h"
 
-#include <map>
+#include <vector>
 #include <filesystem>
 
-class Layout;
+class Shader;
 
 struct PipelineDescription
 {
-	std::map<StageFlag, std::filesystem::path> ShaderModules;
-	VkDescriptorSetLayout DescSetLayout = nullptr;
-	const Layout* BufferLayout = nullptr;
-
+	std::vector<std::pair<StageFlag, std::filesystem::path>> ShaderModules;
 	CompareOp CompareOp = CompareOp::LESS;
 	PolygonMode PolygonMode = PolygonMode::FILL;
-	CullMode CullMode = CullMode::BACK;
+	float LineWidth = 1.0f;
+	CullMode CullMode = CullMode::NONE;
 	PrimitiveTopology Topology = PrimitiveTopology::TRIANGLE_LIST;
 	bool EnableTransparency = false;
+	bool EnableDynamicStates = false;
 };
 
 class Pipeline : public Handle<VkPipeline, VkPipelineLayout>
 {
 public:
 	static Ref<Pipeline> Create(const PipelineDescription& desc);
+	static Ref<Pipeline> Create(const PipelineDescription& desc, Ref<Shader> shader);
 
-	Pipeline(const PipelineDescription& desc);
+	Pipeline(const PipelineDescription& desc, Ref<Shader> shader);
 	~Pipeline();
+
+	WeakRef<Shader> GetShader() const;
+
+	const PipelineDescription& GetDescription() const;
 private:
-	void CreatePipeline(const PipelineDescription& desc);
+	void CreatePipelineLayout();
+	void CreatePipeline();
+private:
+	PipelineDescription m_Description;
+
+	Ref<Shader> m_Shader = nullptr;
 };

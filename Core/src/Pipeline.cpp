@@ -19,74 +19,117 @@
 
 Ref<Pipeline> Pipeline::Create(const PipelineDescription& desc)
 {
-	return CreateRef<Pipeline>(desc);
+	return CreateRef<Pipeline>(desc, Shader::Create(desc.ShaderModules));
 }
 
-Pipeline::Pipeline(const PipelineDescription& desc)
+Ref<Pipeline> Pipeline::Create(const PipelineDescription& desc, Ref<Shader> shader)
 {
-	CreatePipeline(desc);
+	ASSERT(desc.ShaderModules.empty());
+
+	return CreateRef<Pipeline>(desc, shader);
+}
+
+Pipeline::Pipeline(const PipelineDescription& desc, Ref<Shader> shader)
+	: m_Description(desc)
+	, m_Shader(std::move(shader))
+{
+	CreatePipelineLayout();
+	CreatePipeline();
 }
 
 Pipeline::~Pipeline()
 {
+	m_Shader.reset();
+
 	const auto& device = Context::GetDevice().GetHandle();
 
 	vkDestroyPipelineLayout(device, Handle::GetHandle<VkPipelineLayout>(), nullptr);
 	vkDestroyPipeline(device, Handle::GetHandle<VkPipeline>(), nullptr);
 }
 
-void Pipeline::CreatePipeline(const PipelineDescription& desc)
+WeakRef<Shader> Pipeline::GetShader() const
 {
+	ASSERT(m_Shader);
+
+	return m_Shader;
+}
+
+const PipelineDescription& Pipeline::GetDescription() const
+{
+	return m_Description;
+}
+
+void Pipeline::CreatePipelineLayout()
+{
+	ASSERT(m_Shader);
+
+	VkPipelineLayoutCreateInfo pipelineLayoutInfo;
+	ZeroInitVkStruct(pipelineLayoutInfo, VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO);
+
+	const auto& descriptorSetLayouts = m_Shader->GetLayouts();
+	const auto& pushConstantRanges = m_Shader->GetPushConstants();
+
+	if (!descriptorSetLayouts.empty())
+	{
+		pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(descriptorSetLayouts.size());
+		pipelineLayoutInfo.pSetLayouts = descriptorSetLayouts.data();
+	}
+
+	if (!pushConstantRanges.empty())
+	{
+		pipelineLayoutInfo.pushConstantRangeCount = static_cast<uint32_t>(pushConstantRanges.size());
+		pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges.data();
+	}
+
+	auto& pipelineLayoutHandle = Handle::GetHandle<VkPipelineLayout>();
+
+	VkResult result = vkCreatePipelineLayout(Context::GetDevice().GetHandle(), &pipelineLayoutInfo, nullptr, &pipelineLayoutHandle);
+	VK_CHECK_RESULT(result);
+	ASSERT(pipelineLayoutHandle, "Pipeline layout creation failed");
+}
+
+void Pipeline::CreatePipeline()
+{
+	ASSERT(m_Shader);
+
+	const auto& desc = m_Description;
+
 	const auto& vkDevice = Context::GetDevice().GetHandle();
 	const auto& swapchain = Context::GetSwapchain();
 	const auto& msaaSamples = swapchain.GetRenderPass()->GetDescription().MSAAnumSamples;
 	const auto& swapchainDesc = swapchain.GetDescription();
 	const auto& renderPass = Context::GetSwapchain().GetRenderPass();
 
-#define OLD_WAY 0
-#if OLD_WAY
-	const auto& bindingDescription = Vertex::GetBindingDescription();
-	const auto& attributeDescriptions = Vertex::GetAttributeDescriptions();
-#else
-	const auto bufferLayout = desc.BufferLayout;
+	std::vector<VkPipelineShaderStageCreateInfo> pipelineShaderStageCreateInfos;
+	for (const auto& shaderModule : m_Shader->GetShaderModules())
+	{
+		auto module = shaderModule.lock();
+		ASSERT(module);
 
-	//ASSERT(bufferLayout, "BufferLayout must be valid");
+		pipelineShaderStageCreateInfos.emplace_back(module->GetCreateInfoForPipeline());
+	}
+
+	auto stride = m_Shader->GetVertexInputStride();
+	const bool hasStride = stride > 0;
+
+	const auto& attributeDescriptions = m_Shader->GetAttributeDescriptions();
 
 	VkVertexInputBindingDescription bindingDescription = {};
-	std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
 
-	if (bufferLayout)
+	if (hasStride)
 	{
-		const auto& bufferLayoutElements = bufferLayout->GetElements();
-
 		bindingDescription.binding = 0;
-		bindingDescription.stride = bufferLayout->GetStride();
+		bindingDescription.stride = stride;
 		bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-		attributeDescriptions.reserve(bufferLayoutElements.size());
-		for (uint32_t i = 0; auto & elem : bufferLayoutElements)
-		{
-			VkVertexInputAttributeDescription attributeDescription = {};
-
-			attributeDescription.binding = 0;
-			attributeDescription.location = i;
-			attributeDescription.format = Convert(elem.Format);
-			attributeDescription.offset = elem.Offset;
-
-			attributeDescriptions.push_back(attributeDescription);
-
-			i++;
-		}
 	}
-#endif
 
 	VkPipelineVertexInputStateCreateInfo vertexInputInfo;
 	ZeroInitVkStruct(vertexInputInfo, VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO);
 
-	vertexInputInfo.vertexBindingDescriptionCount = 1;
-	vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
-	vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
-	vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
+	vertexInputInfo.vertexBindingDescriptionCount = hasStride ? 1 : 0;
+	vertexInputInfo.pVertexBindingDescriptions = hasStride ? &bindingDescription : nullptr;
+	vertexInputInfo.vertexAttributeDescriptionCount = hasStride ? uint32_t(attributeDescriptions.size()) : 0;
+	vertexInputInfo.pVertexAttributeDescriptions = hasStride ? attributeDescriptions.data() : nullptr;
 
 	VkPipelineInputAssemblyStateCreateInfo inputAssembly;
 	ZeroInitVkStruct(inputAssembly, VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO);
@@ -114,13 +157,24 @@ void Pipeline::CreatePipeline(const PipelineDescription& desc)
 	viewportState.scissorCount = 1;
 	viewportState.pScissors = &scissor;
 
+	static constexpr std::array s_DynamicStates = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_LINE_WIDTH };
+
+	VkPipelineDynamicStateCreateInfo dynamicStateInfo;
+	ZeroInitVkStruct(dynamicStateInfo, VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO);
+
+	if (desc.EnableDynamicStates)
+	{
+		dynamicStateInfo.dynamicStateCount = static_cast<uint32_t>(s_DynamicStates.size());
+		dynamicStateInfo.pDynamicStates = s_DynamicStates.data();
+	}
+
 	VkPipelineRasterizationStateCreateInfo rasterizer;
 	ZeroInitVkStruct(rasterizer, VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO);
 
 	rasterizer.depthClampEnable = VK_FALSE;
 	rasterizer.rasterizerDiscardEnable = VK_FALSE;
 	rasterizer.polygonMode = Convert(desc.PolygonMode);
-	rasterizer.lineWidth = 1.0f;
+	rasterizer.lineWidth = desc.LineWidth;
 	rasterizer.cullMode = Convert(desc.CullMode);
 	rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	rasterizer.depthBiasEnable = VK_FALSE;
@@ -154,23 +208,6 @@ void Pipeline::CreatePipeline(const PipelineDescription& desc)
 	colorBlending.attachmentCount = 1;
 	colorBlending.pAttachments = &colorBlendAttachment;
 
-	VkPipelineLayoutCreateInfo pipelineLayoutInfo;
-	ZeroInitVkStruct(pipelineLayoutInfo, VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO);
-
-	if (desc.DescSetLayout)
-	{
-		std::array<VkDescriptorSetLayout, 1> descriptorSetLayout = { desc.DescSetLayout };
-
-		pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(descriptorSetLayout.size());
-		pipelineLayoutInfo.pSetLayouts = descriptorSetLayout.data();
-	}
-
-	auto& pipelineLayoutHandle = Handle::GetHandle<VkPipelineLayout>();
-
-	VkResult result = vkCreatePipelineLayout(vkDevice, &pipelineLayoutInfo, nullptr, &pipelineLayoutHandle);
-	VK_CHECK_RESULT(result);
-	ASSERT(pipelineLayoutHandle, "Pipeline layout creation failed");
-
 	VkPipelineDepthStencilStateCreateInfo depthStencil;
 	ZeroInitVkStruct(depthStencil, VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO);
 
@@ -182,17 +219,6 @@ void Pipeline::CreatePipeline(const PipelineDescription& desc)
 	depthStencil.maxDepthBounds = 1.0f;
 	depthStencil.stencilTestEnable = VK_FALSE;
 
-	std::vector<Ref<Shader>> shaders(desc.ShaderModules.size());
-	for (uint32_t i = 0; const auto & [stage, path] : desc.ShaderModules)
-		shaders[i++] = Shader::Create(stage, path);
-
-	std::vector<VkPipelineShaderStageCreateInfo> pipelineShaderStageCreateInfos;
-	for (const auto& shader : shaders)
-	{
-		if (shader)
-			pipelineShaderStageCreateInfos.emplace_back(shader->GetCreateInfoForPipeline());
-	}
-
 	VkGraphicsPipelineCreateInfo pipelineInfo;
 	ZeroInitVkStruct(pipelineInfo, VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO);
 
@@ -201,21 +227,18 @@ void Pipeline::CreatePipeline(const PipelineDescription& desc)
 	pipelineInfo.pVertexInputState = &vertexInputInfo;
 	pipelineInfo.pInputAssemblyState = &inputAssembly;
 	pipelineInfo.pViewportState = &viewportState;
+	pipelineInfo.pDynamicState = &dynamicStateInfo;
 	pipelineInfo.pRasterizationState = &rasterizer;
 	pipelineInfo.pMultisampleState = &multisampling;
 	pipelineInfo.pDepthStencilState = &depthStencil;
 	pipelineInfo.pColorBlendState = &colorBlending;
-	pipelineInfo.layout = pipelineLayoutHandle;
+	pipelineInfo.layout = Handle::GetHandle<VkPipelineLayout>();
 	pipelineInfo.renderPass = renderPass->GetHandle();
 	pipelineInfo.subpass = 0;
 
 	auto& pipelineHandle = Handle::GetHandle<VkPipeline>();
 
-	result = vkCreateGraphicsPipelines(vkDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipelineHandle);
+	VkResult result = vkCreateGraphicsPipelines(vkDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipelineHandle);
 	VK_CHECK_RESULT(result);
-	ASSERT(pipelineHandle, "Grapphics pipeline creation failed");
-
-	// Unnecessary
-	for (auto& shader : shaders)
-		shader.reset();
+	ASSERT(pipelineHandle, "Graphics pipeline creation failed");
 }

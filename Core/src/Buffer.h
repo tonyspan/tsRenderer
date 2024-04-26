@@ -51,15 +51,17 @@ public:
 	}
 
 	template <typename T>
-	T* As()
+		requires std::is_pointer_v<T>
+	T As()
 	{
-		return reinterpret_cast<T*>(m_Data);
+		return reinterpret_cast<T>(m_Data);
 	}
 
 	template <typename T>
-	const T* As() const
+		requires std::is_pointer_v<T>&& std::is_const_v<std::remove_pointer_t<T>>
+	T As() const
 	{
-		return reinterpret_cast<const T*>(m_Data);
+		return reinterpret_cast<T>(m_Data);
 	}
 
 	const uint64_t GetSize() const;

@@ -6,7 +6,12 @@ layout (location = 0) out vec4 outColor;
 
 layout(binding = 1) uniform sampler2D uTexture;
 
+layout(push_constant) uniform PC
+{
+    layout(offset = 64) float Opacity;
+} constants;
+
 void main()
 {
-   outColor = texture(uTexture, inTexCoord);
+    outColor = vec4(texture(uTexture, inTexCoord).rgb, constants.Opacity);
 }

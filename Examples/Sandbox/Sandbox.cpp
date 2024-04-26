@@ -15,14 +15,14 @@ class Sandbox : public Application
 	{
 		alignas(16) glm::mat4 MVP;
 		alignas(16) glm::mat4 Model;
-		alignas(16) glm::mat4 nMat;
+		alignas(16) glm::mat4 Normal;
 	};
 
 	struct GUBO
 	{
 		alignas(16) glm::vec3 LightDir;
 		alignas(16) glm::vec4 LightColor;
-		alignas(16) glm::vec3 EyePos; // Camera position
+		alignas(16) glm::vec3 CameraPosition;
 	};
 private:
 	virtual void OnInit() override
@@ -31,22 +31,6 @@ private:
 		m_Camera = Camera(float(width) / float(height));
 
 		ShaderCompiler::CompileWithValidator(GetProjectDirectory() + "/Shaders/");
-
-		DescriptorSetLayout dsl = {
-			{.Name = "UBO", .Binding = 0, .Type = DescriptorType::UNIFORM_BUFFER, .Stage = StageFlag::VERTEX },
-			{.Name = "uTexture", .Binding = 1, .Type = DescriptorType::COMBINED_IMAGE_SAMPLER, .Stage = StageFlag::FRAGMENT },
-			{.Name = "GUBO", .Binding = 2, .Type = DescriptorType::UNIFORM_BUFFER, .Stage = StageFlag::ALL_GRAPHICS },
-		};
-
-		DescriptorSetLayout dsl2 = {
-			{.Name = "UBO", .Binding = 0, .Type = DescriptorType::UNIFORM_BUFFER, .Stage = StageFlag::VERTEX },
-			{.Name = "uTexture", .Binding = 1, .Type = DescriptorType::COMBINED_IMAGE_SAMPLER, .Stage = StageFlag::FRAGMENT }
-		};
-
-		Layout layout;
-		layout.Add<glm::vec3>("inPosition");
-		layout.Add<glm::vec3>("inNormal");
-		layout.Add<glm::vec2>("inTexCoord");
 
 		// Xwing
 		{
@@ -58,7 +42,13 @@ private:
 			m_UniformBuffers.insert({ xWingAssetName, GBuffer::CreateUniform(sizeof(Sandbox::UBO)) });
 			m_UniformBuffers.insert({ xWingAssetName, GBuffer::CreateUniform(sizeof(Sandbox::GUBO)) });
 
-			m_DescriptorSets[xWingAssetName] = DescriptorSet::Create(dsl);
+			PipelineDescription desc;
+
+			desc.ShaderModules = { { StageFlag::VERTEX, "Shaders/Phong.vert.spv" }, { StageFlag::FRAGMENT, "Shaders/Phong.frag.spv" } };
+
+			m_Pipelines[xWingAssetName] = Pipeline::Create(desc);
+
+			m_DescriptorSets[xWingAssetName] = DescriptorSet::Create({ m_Pipelines[xWingAssetName]->GetShader() });
 
 			uint32_t binding = 0;
 			auto range = m_UniformBuffers.equal_range(xWingAssetName);
@@ -68,15 +58,7 @@ private:
 				binding += 2;
 			}
 
-			m_DescriptorSets[xWingAssetName]->SetTexture(1, *m_Textures[xWingAssetName]);
-
-			PipelineDescription desc;
-
-			desc.DescSetLayout = m_DescriptorSets[xWingAssetName]->GetLayout();
-			desc.BufferLayout = &layout;
-			desc.ShaderModules = { { StageFlag::VERTEX, "Shaders/Phong.vert.spv" }, { StageFlag::FRAGMENT, "Shaders/Phong.frag.spv" } };
-
-			m_Pipelines[xWingAssetName] = Pipeline::Create(desc);
+			m_DescriptorSets[xWingAssetName]->SetTexture(1, static_cast<const Texture&>(*m_Textures[xWingAssetName]));
 		}
 
 		// Skybox
@@ -84,25 +66,23 @@ private:
 			const auto skyboxAssetName = s_AssetsNames[1];
 
 			m_Skybox = Skybox::Create("Models/SkyboxCube.obj",
-				{ "textures/sky/right.png", "textures/sky/left.png",
-				"textures/sky/top.png",   "textures/sky/bottom.png",
-				"textures/sky/front.png", "textures/sky/back.png" });
-
-			m_DescriptorSets[skyboxAssetName] = DescriptorSet::Create(dsl2);
+				{ "Textures/sky/right.png", "Textures/sky/left.png",
+				"Textures/sky/top.png",   "Textures/sky/bottom.png",
+				"Textures/sky/front.png", "Textures/sky/back.png" });
 
 			const auto& skyboxUniform = m_UniformBuffers.insert({ skyboxAssetName, GBuffer::CreateUniform(sizeof(Sandbox::UBO)) });
 
-			m_DescriptorSets[skyboxAssetName]->SetBuffer(0, *(skyboxUniform->second));
-			m_DescriptorSets[skyboxAssetName]->SetTexture(1, m_Skybox->GetTexture());
-
 			PipelineDescription desc;
 
-			desc.DescSetLayout = m_DescriptorSets[skyboxAssetName]->GetLayout();
-			desc.BufferLayout = &layout;
 			desc.ShaderModules = { { StageFlag::VERTEX, "Shaders/Skybox.vert.spv" }, { StageFlag::FRAGMENT, "Shaders/Skybox.frag.spv" } };
 			desc.CompareOp = CompareOp::LESS_OR_EQUAL;
 
 			m_Pipelines[skyboxAssetName] = Pipeline::Create(desc);
+
+			m_DescriptorSets[skyboxAssetName] = DescriptorSet::Create({ m_Pipelines[skyboxAssetName]->GetShader() });
+
+			m_DescriptorSets[skyboxAssetName]->SetBuffer(0, *(skyboxUniform->second));
+			m_DescriptorSets[skyboxAssetName]->SetTexture(1, static_cast<const Texture&>(m_Skybox->GetTexture()));
 		}
 
 		// Room
@@ -115,7 +95,14 @@ private:
 			m_UniformBuffers.insert({ roomAssetName, GBuffer::CreateUniform(sizeof(Sandbox::UBO)) });
 			m_UniformBuffers.insert({ roomAssetName, GBuffer::CreateUniform(sizeof(Sandbox::GUBO)) });
 
-			m_DescriptorSets[roomAssetName] = DescriptorSet::Create(dsl);
+			PipelineDescription desc;
+
+			desc.ShaderModules = { { StageFlag::VERTEX, "Shaders/Phong.vert.spv" }, { StageFlag::FRAGMENT, "Shaders/Phong.frag.spv" } };
+			desc.CullMode = CullMode::NONE;
+
+			m_Pipelines[roomAssetName] = Pipeline::Create(desc);
+
+			m_DescriptorSets[roomAssetName] = DescriptorSet::Create({ m_Pipelines[roomAssetName]->GetShader() });
 
 			uint32_t binding = 0;
 			auto range = m_UniformBuffers.equal_range(roomAssetName);
@@ -125,16 +112,7 @@ private:
 				binding += 2;
 			}
 
-			m_DescriptorSets[roomAssetName]->SetTexture(1, *m_Textures[roomAssetName]);
-
-			PipelineDescription desc;
-
-			desc.DescSetLayout = m_DescriptorSets[roomAssetName]->GetLayout();
-			desc.BufferLayout = &layout;
-			desc.ShaderModules = { { StageFlag::VERTEX, "Shaders/Phong.vert.spv" }, { StageFlag::FRAGMENT, "Shaders/Phong.frag.spv" } };
-			desc.CullMode = CullMode::NONE;
-
-			m_Pipelines[roomAssetName] = Pipeline::Create(desc);
+			m_DescriptorSets[roomAssetName]->SetTexture(1, static_cast<const Texture&>(*m_Textures[roomAssetName]));
 		}
 
 		// Text
@@ -150,21 +128,19 @@ private:
 
 			const auto& textUniform = m_UniformBuffers.insert({ textAssetName, GBuffer::CreateUniform(sizeof(Sandbox::UBO)) });
 
-			m_DescriptorSets[textAssetName] = DescriptorSet::Create(dsl2);
-
-			m_DescriptorSets[textAssetName]->SetBuffer(0, *(textUniform->second));
-			m_DescriptorSets[textAssetName]->SetTexture(1, *m_Textures[textAssetName]);
-
 			PipelineDescription desc;
 
-			desc.DescSetLayout = m_DescriptorSets[textAssetName]->GetLayout();
-			desc.BufferLayout = &layout;
 			desc.ShaderModules = { { StageFlag::VERTEX, "Shaders/Text.vert.spv" }, { StageFlag::FRAGMENT, "Shaders/Text.frag.spv" } };
 			desc.CompareOp = CompareOp::LESS_OR_EQUAL;
 			desc.CullMode = CullMode::NONE;
 			desc.EnableTransparency = true;
 
 			m_Pipelines[textAssetName] = Pipeline::Create(desc);
+
+			m_DescriptorSets[textAssetName] = DescriptorSet::Create({ m_Pipelines[textAssetName]->GetShader() });
+
+			m_DescriptorSets[textAssetName]->SetBuffer(0, *(textUniform->second));
+			m_DescriptorSets[textAssetName]->SetTexture(1, static_cast<const Texture&>(*m_Textures[textAssetName]));
 		}
 	}
 
@@ -179,7 +155,7 @@ private:
 		UpdateUniformBuffers();
 	}
 
-	virtual void Render(CommandBuffer& commandBuffer) override
+	virtual void OnRender(CommandBuffer& commandBuffer) override
 	{
 		for (size_t i = 0; i < s_AssetsNames.size(); i++)
 		{
@@ -260,12 +236,12 @@ private:
 			Sandbox::UBO ubo = {};
 			ubo.Model = m_Models[xWingAssetName];
 			ubo.MVP = cameraViewProjection * ubo.Model;
-			ubo.nMat = glm::inverseTranspose(ubo.Model);
+			ubo.Normal = glm::inverseTranspose(ubo.Model);
 
 			Sandbox::GUBO gubo = {};
 			gubo.LightDir = glm::vec3(glm::cos(glm::radians(135.0f)), glm::sin(glm::radians(135.0f)), 0.0f);
 			gubo.LightColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-			gubo.EyePos = cameraPosition;
+			gubo.CameraPosition = cameraPosition;
 
 
 			uint32_t binding = 0;
@@ -284,9 +260,9 @@ private:
 			const auto skyboxAssetName = s_AssetsNames[1];
 
 			Sandbox::UBO sbubo = {};
-			sbubo.Model = glm::mat4(1.0f);
-			sbubo.nMat = glm::mat4(1.0f);
 			sbubo.MVP = m_Camera.GetProjection() * glm::transpose(glm::mat4(m_Camera.GetRotation()));
+			sbubo.Model = glm::mat4(1.0f);
+			sbubo.Normal = glm::mat4(1.0f);
 
 			m_UniformBuffers.find(skyboxAssetName)->second->SetData(&sbubo);
 		}
@@ -298,12 +274,12 @@ private:
 			Sandbox::UBO ubo = {};
 			ubo.Model = m_Models[roomAssetName];
 			ubo.MVP = m_Camera.GetViewProjection() * ubo.Model;
-			ubo.nMat = glm::inverseTranspose(ubo.Model);
+			ubo.Normal = glm::inverseTranspose(ubo.Model);
 
 			Sandbox::GUBO gubo = {};
 			gubo.LightDir = glm::vec3(glm::cos(glm::radians(135.0f)), glm::sin(glm::radians(135.0f)), 0.0f);
 			gubo.LightColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-			gubo.EyePos = cameraPosition;
+			gubo.CameraPosition = cameraPosition;
 
 			uint32_t binding = 0;
 			auto range = m_UniformBuffers.equal_range(roomAssetName);
@@ -333,9 +309,9 @@ private:
 
 int main(int argc, char** argv)
 {
-	Scope<Application> app = CreateScope<Sandbox>();
+	Sandbox app;
 
-	app->Run();
+	app.Run();
 
 	return 0;
 }

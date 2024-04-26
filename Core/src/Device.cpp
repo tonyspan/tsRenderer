@@ -4,6 +4,7 @@
 #include "Surface.h"
 #include "SwapchainSupportDetails.h"
 #include "Context.h"
+#include "DescriptorPool.h"
 
 #include "Log.h"
 
@@ -215,11 +216,13 @@ Device::Device(const Instance& instance, const Surface& surface)
 	CreateDeviceAndQueues();
 
 	m_CommandPool = CreateScope<CommandPool>(*this);
+	m_DescriptorPool = CreateScope<DescriptorPool>(*this);
 }
 
 Device::~Device()
 {
 	m_CommandPool.reset();
+	m_DescriptorPool.reset();
 
 	vkDestroyDevice(Handle::GetHandle(), nullptr);
 }
@@ -249,6 +252,11 @@ const CommandPool& Device::GetCommandPool() const
 	return *m_CommandPool;
 }
 
+const DescriptorPool& Device::GetDescriptorPool() const
+{
+	return *m_DescriptorPool;
+}
+
 void Device::CreateDeviceAndQueues()
 {
 	constexpr float queuePriority = 1.0f;
@@ -275,6 +283,8 @@ void Device::CreateDeviceAndQueues()
 	VkPhysicalDeviceFeatures deviceFeatures = {};
 	deviceFeatures.samplerAnisotropy = VK_TRUE;
 	deviceFeatures.sampleRateShading = VK_TRUE;
+	deviceFeatures.fillModeNonSolid = VK_TRUE;
+	deviceFeatures.wideLines = VK_TRUE;
 
 	VkDeviceCreateInfo createInfo;
 	ZeroInitVkStruct(createInfo, VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO);

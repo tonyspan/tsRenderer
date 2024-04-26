@@ -4,11 +4,6 @@
 
 #include "Log.h"
 
-Layout::Layout()
-	: m_Stride(0)
-{
-}
-
 const std::vector<LayoutElement>& Layout::GetElements() const
 {
 	return m_Elements;

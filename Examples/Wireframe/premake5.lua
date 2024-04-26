@@ -1,4 +1,4 @@
-project "Triangle"
+project "Wireframe"
 	kind "ConsoleApp"
 
 	targetdir ("%{wks.location}/bin/" .. outputdir .. "/%{prj.name}")
@@ -14,6 +14,7 @@ project "Triangle"
 	{
 		"%{wks.location}/Core/src",
 		"%{IncludeDir.glm}",
+		"%{IncludeDir.ImGui}"
 	}
 
 	links

@@ -3,6 +3,7 @@
 #include "Base.h"
 
 class CommandBuffer;
+class DescriptorPool;
 class Window;
 
 class IMGUI
@@ -18,4 +19,6 @@ public:
 
 	void NewFrame();
 	void Render(CommandBuffer& commandBuffer);
+private:
+	Ref<DescriptorPool> m_DescriptorPool;
 };

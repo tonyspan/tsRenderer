@@ -5,7 +5,7 @@ workspace "tsVKRenderer"
 	characterset ("MBCS")
 	flags "MultiProcessorCompile"
 
-	startproject "Sandbox"
+	startproject "Triangle"
 
 	configurations
 	{
@@ -61,4 +61,5 @@ group "Examples"
 	include "Examples/Sandbox"
 	include "Examples/Triangle"
 	include "Examples/Cube"
+	include "Examples/Wireframe"
 group ""
